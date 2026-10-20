@@ -1,25 +1,25 @@
 # Deployment status
 
-## Completed
+## Completed and verified
 
-- Backup before Auth/database changes: `/home/ubuntu/nexora-market-auth-backup-20261020-092914.tar.gz`.
-- Supabase project `nexora-market` (`nbhfdiiehukdtusxksni`) is active and healthy. RLS is enabled on the marketplace tables and the security advisor currently returns no lints.
-- `add_auth_cart_and_cod_checkout` was applied. It added owner-only `carts` and `wishlists`, automatic profile creation after Auth signup, a cart-required order insert policy, and the `create_cod_order` database RPC.
-- Browser-safe Supabase configuration and REST client were added. Only the project URL and publishable key are used in browser code; no service-role key is present.
-- Auth UI supports sign-up, sign-in, sign-out, local session persistence, refresh-token handling, and error display.
-- Live mode loads only published products from Supabase. The live catalog currently has zero published products and correctly renders an empty state.
-- Live cart/wishlist/order-history flows are protected by sign-in and RLS. Demo mode is explicit and cannot create a real cart or fake successful order.
-- Anonymous `create_cod_order` access was tested and returned HTTP 401. Anonymous cart reads returned HTTP 200 with no rows, consistent with RLS. Invalid login returned HTTP 400. The live database connection, Auth modal, live empty state, and demo separation were browser-tested.
-- Updated source was committed as `d120b17` and pushed to the dedicated repository.
-- GitHub Actions Pages workflow completed successfully for `d120b17`.
-- Live website was opened and verified at: https://eei852552-rgb.github.io/nexora-market-production/
+- Dedicated repository: `https://github.com/eei852552-rgb/nexora-market-production`. NEXUS AUTODEV and unrelated repositories were not modified.
+- Supabase project `nexora-market` (`nbhfdiiehukdtusxksni`) is active and healthy. The live database has RLS enabled on marketplace tables.
+- Auth/cart/COD migration and seller/admin controls migration are applied. Seller applications, approved-seller product CRUD, advertising drafts, admin-only moderation, and seller-readable commission records are now represented in the database with RLS.
+- Auth UI supports sign-up, sign-in, sign-out, email-confirmation messaging, password-reset request, recovery-link password update, local session persistence, refresh-token handling, and user-friendly errors.
+- Live mode reads only published products. The live catalog currently has zero published products and correctly renders an empty state. Demo products are explicitly separated and cannot create a real cart or fake successful order.
+- SEO/PWA/accessibility hardening added: exact NEXORA MARKET brand label, SVG favicon, web manifest, canonical/description metadata, robots.txt, sitemap.xml, and a root `manus-routes.json` route manifest.
+- Local fresh server test on port 3011 passed: `/health` 200, route manifest JSON, static assets 200, and JavaScript syntax checks passed.
+- Anonymous REST checks for seller applications, advertisements, and commissions returned empty results under RLS. Anonymous COD access previously returned HTTP 401; invalid login returned HTTP 400.
+- Password reset UI was browser-tested. Auth signup reached Supabase but a disposable QA request returned HTTP 429 `email rate limit exceeded`; no repeated account creation was attempted.
 
-## Test limitation
+## Live deployment
 
-A disposable Auth signup test reached Supabase but returned HTTP 429 `email rate limit exceeded`; no verified QA session was available to complete a real signed-in cart/order browser test. The frontend handles this error without claiming signup success. A real confirmed test account or a later Auth email-rate-limit window is required for that final end-to-end test.
+The verified production URL is https://eei852552-rgb.github.io/nexora-market-production/. The last verified Pages workflow succeeded for the previous application commit. This audit batch still needs its new commit pushed and the resulting workflow/live URL rechecked before the new seller/admin build is called deployed.
 
-## Honest product status
+## Exact remaining blockers
 
-Real Auth and database integration is implemented in source and the database migration is applied, but no real published products or verified QA account currently exist. Online payments remain disabled. Demo sellers, ratings, orders, and metrics are not real customer data.
+Supabase security advisors report one warning: `auth_leaked_password_protection` — leaked password protection is disabled. The current Supabase MCP exposes migrations and advisors but not Auth security-setting writes, so enabling it needs Supabase dashboard/management permission. This is a security hardening item, not a reason to weaken Auth or bypass rate limits.
 
-The older `nexora-market` repository and NEXUS AUTODEV were not modified.
+A confirmed user session is still unavailable for a real signed-in cart/order end-to-end test because Auth email signup is rate-limited. The source and RLS paths are implemented, but that test remains explicitly unverified. There are currently no published products, so live checkout cannot be exercised with a real listing.
+
+Online payments remain disabled and no paid service or domain was purchased.

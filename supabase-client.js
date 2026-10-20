@@ -3,6 +3,14 @@
   const sessionKey = 'nexora.supabase.session';
   const base = `${config.url}`;
 
+  function restoreRecoveryFromHash() {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    if (params.get('type') !== 'recovery' || !params.get('access_token')) return false;
+    saveSession({ access_token: params.get('access_token'), refresh_token: params.get('refresh_token'), token_type: params.get('token_type') || 'bearer', expires_in: Number(params.get('expires_in') || 3600), expires_at: Number(params.get('expires_at') || 0) });
+    window.NEXORA_RECOVERY = true;
+    return true;
+  }
+
   function readSession() {
     try { return JSON.parse(localStorage.getItem(sessionKey) || 'null'); } catch { return null; }
   }
@@ -52,6 +60,14 @@
     const result = await authRequest('token?grant_type=password', { email, password });
     saveSession(result); return result;
   }
+  async function requestPasswordReset(email, redirectTo = window.location.href) {
+    return authRequest('recover', { email, redirect_to: redirectTo });
+  }
+  async function updatePassword(password) {
+    const current = await session();
+    if (!current?.access_token) throw new Error('Recovery session expired. Request a new reset email.');
+    return parse(await fetch(`${base}/auth/v1/user`, { method: 'PUT', headers: authHeaders(current), body: JSON.stringify({ password }) }));
+  }
   async function signOut() {
     const current = readSession();
     if (current?.access_token) { try { await fetch(`${base}/auth/v1/logout`, { method: 'POST', headers: authHeaders(current) }); } catch {} }
@@ -71,5 +87,6 @@
   async function rpc(name, args = {}) {
     return rest(`rpc/${name}`, { method: 'POST', body: JSON.stringify(args) });
   }
-  window.NexoraDB = { config, session, user, signUp, signIn, signOut, rest, rpc, saveSession };
+  restoreRecoveryFromHash();
+  window.NexoraDB = { config, session, user, signUp, signIn, requestPasswordReset, updatePassword, signOut, rest, rpc, saveSession };
 })();

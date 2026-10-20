@@ -1,1 +1,1 @@
-export default { logoUrl: "https://dummyimage.com/256x256/091224/4e9cff.png&text=N" };
+export default { logoUrl: "https://eei852552-rgb.github.io/nexora-market-production/favicon.svg" };

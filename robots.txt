@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://eei852552-rgb.github.io/nexora-market-production/sitemap.xml

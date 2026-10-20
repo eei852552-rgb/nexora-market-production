@@ -1,0 +1,10 @@
+{
+  "name": "NEXORA MARKET",
+  "short_name": "NEXORA",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#080f1e",
+  "theme_color": "#091224",
+  "description": "A live Supabase-backed Myanmar marketplace with an explicit demo preview.",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
