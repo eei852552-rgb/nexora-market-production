@@ -17,7 +17,7 @@
 
 ## Live deployment
 
-The verified production URL is https://eei852552-rgb.github.io/nexora-market-production/. GitHub Actions run `39407436392` completed successfully for commit `32744e3`. The live URL was opened in the browser with the cache-busted release query, the live empty-catalog state and disclosure footer loaded, and the privacy launch note opened successfully. HTTP checks for the HTML, versioned JavaScript assets, disclosure document, favicon, manifest, robots, sitemap, and root route manifest all returned 200.
+The verified production URL is https://eei852552-rgb.github.io/nexora-market-production/. Application release commit `32744e3` deployed successfully in run `39407436392`; the follow-up disclosure/QA documentation commit `0cb966f` deployed successfully in run `39407682336`. The live URL was opened in the browser with the cache-busted release query, the live empty-catalog state and disclosure footer loaded, and the privacy launch note opened successfully. HTTP checks for the HTML, versioned JavaScript assets, disclosure document, favicon, manifest, robots, sitemap, and root route manifest all returned 200.
 
 ## Exact remaining blockers
 
