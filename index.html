@@ -12,7 +12,7 @@
   <title>NEXORA MARKET</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20261020-3">
 </head>
 <body>
   <div id="app">
@@ -22,13 +22,13 @@
       <div class="top-actions"><button class="lang" id="langBtn">မြန်မာ</button><button class="round" id="wishBtn" aria-label="Wishlist">♡<i id="wishCount">0</i></button><button class="round" id="cartBtn" aria-label="Cart">▱<i id="cartCount">0</i></button><button class="profile-btn" id="profileBtn"><span class="avatar">D</span><span class="profile-name">Sign in</span><b>⌄</b></button></div>
     </header>
     <div class="mobile-search search"><span>⌕</span><input id="mobileSearch" placeholder="Search / ရှာရန်"></div>
-    <nav class="nav"><div class="nav-inner"><button class="nav-link active" data-view="home">Discover</button><button class="nav-link" data-view="categories">Categories</button><button class="nav-link" data-view="wishlist">Wishlist</button><button class="nav-link" data-view="orders">My orders</button><button class="nav-link" data-view="seller">Seller hub</button><button class="nav-link" data-view="admin">Admin console</button><span class="nav-spacer"></span><span class="safe-note">Connecting to live database…</span></div></nav>
+    <nav class="nav"><div class="nav-inner"><button class="nav-link active" data-view="home" data-i18n="discover">Discover</button><button class="nav-link" data-view="categories" data-i18n="categories">Categories</button><button class="nav-link" data-view="wishlist" data-i18n="wishlist">Wishlist</button><button class="nav-link" data-view="orders" data-i18n="orders">My orders</button><button class="nav-link" data-view="seller" data-i18n="seller">Seller hub</button><button class="nav-link" data-view="admin" data-i18n="admin">Admin console</button><span class="nav-spacer"></span><span class="safe-note">Connecting to live database…</span></div></nav>
     <main id="main"></main>
-    <nav class="bottom-nav"><button data-view="home" class="active">⌂<small>Home</small></button><button data-view="categories">▦<small>Categories</small></button><button id="mobileCart">▱<small>Cart</small></button><button data-view="orders">⌑<small>Orders</small></button><button id="mobileProfile">◎<small>Account</small></button></nav>
+    <nav class="bottom-nav"><button data-view="home" class="active">⌂<small data-i18n="home">Home</small></button><button data-view="categories">▦<small data-i18n="categories">Categories</small></button><button id="mobileCart">▱<small data-i18n="cart">Cart</small></button><button data-view="orders">⌑<small data-i18n="ordersShort">Orders</small></button><button id="mobileProfile">◎<small data-i18n="account">Account</small></button></nav>
     <div id="drawer"></div><div id="toast" role="status"></div>
   </div>
-  <script src="config.js"></script>
-  <script src="supabase-client.js"></script>
-  <script src="app.js"></script>
+  <script src="config.js?v=20261020-3"></script>
+  <script src="supabase-client.js?v=20261020-3"></script>
+  <script src="app.js?v=20261020-3"></script>
 </body>
 </html>

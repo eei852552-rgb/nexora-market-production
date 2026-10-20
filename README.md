@@ -20,7 +20,7 @@ Signed-in users can apply to become sellers. Database RLS requires an approved s
 
 Sign up, sign in, sign out, email-confirmation messaging, password-reset request, recovery-link password update, local session persistence, and refresh-token handling are implemented through Supabase Auth REST endpoints. Signed-in users can persist carts and wishlists through RLS. COD checkout calls `create_cod_order`, which validates delivery details, reads the user's cart, validates product availability and prices, uses the existing stock/total triggers, clears the cart only after success, and returns an error without a success message when the database rejects the order.
 
-The database migrations are recorded in `supabase/auth-cart-cod.sql`, `supabase/production-hardening.sql`, and `supabase/seller-admin-controls.sql`.
+The database migrations are recorded in `supabase/auth-cart-cod.sql`, `supabase/production-hardening.sql`, `supabase/seller-admin-controls.sql`, and `supabase/launch-security-hardening.sql`. The launch hardening migration removes anonymous table grants, limits authenticated table privileges to the operations the app needs, validates MMK prices/stock/categories/descriptions/HTTPS images, and prevents sellers from self-approving advertising records.
 
 ## Security and known configuration item
 
