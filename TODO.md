@@ -7,6 +7,7 @@
 - [x] Add seller application workflow, approved-seller product draft creation, advertising draft controls, admin application/product moderation, and commission visibility policies enforced by database authorization.
 - [x] Remove anonymous table write/read grants for private data, reduce unnecessary authenticated table privileges, validate product/ad inputs, and prevent seller self-approval of ad status.
 - [x] Verify Burmese/English shell switching and translate the navigation, empty live catalog, demo CTA, hero, and anonymous-safety copy.
+- [x] Draft non-legal launch disclosures for privacy, terms, seller rules, delivery/returns, contact status, and controlled-launch limitations without inventing business details.
 - [x] Add published-product loading, persistent cart, persistent wishlist, order history, and database-backed COD creation.
 - [x] Add favicon, PWA manifest, canonical metadata, robots.txt, sitemap.xml, accessible brand label, and root route manifest.
 - [x] Verify anonymous isolation, live empty-catalog behavior, demo separation, local server assets/routes, syntax, and browser Auth/password-reset entry points.
