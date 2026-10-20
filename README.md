@@ -10,22 +10,18 @@ npm start
 
 Open `http://localhost:3001`. On an Android phone, you can use the project files in Acode and its preview. No API key is required for the demo.
 
-## What is not connected yet
+## GitHub Pages deployment
 
-The app is intentionally safe in demo mode. Supabase Auth/database is not connected until a Supabase project URL and browser-safe anon key are configured. The service-role key must never be placed in browser code. Online payments are disabled; the initial checkout only records a cash-on-delivery order in demo state. Do not claim real payment success until a provider is selected, configured, and tested for Myanmar.
+The repository includes `.github/workflows/pages.yml`. After the repository's Pages source is set to **GitHub Actions**, every push to `main` deploys the static website automatically. The site does not require the Node server in production because GitHub Pages serves `index.html`, `styles.css`, `app.js`, and `public/` directly.
 
-## Optional Supabase setup
+## Data and payments status
 
-1. Create a Supabase project on the free tier.
-2. Open SQL Editor and run `supabase/schema.sql`.
-3. Enable Email or another suitable Auth provider.
-4. Add only the project URL and anon key to a future browser-safe config file.
-5. Keep the service-role key server-side and add server authorization before enabling private persistence.
+The UI is intentionally labeled demo mode. Supabase is available as an authorized project and the database schema/RLS foundation exists, but this static build does not claim real authentication or persistence until the client auth flow is connected and tested. Online payments are disabled; the initial checkout only demonstrates cash-on-delivery and never stores card details. Do not claim real payment success until a provider is selected, configured, and tested for Myanmar.
 
-## Cloudflare Pages
+## Supabase setup
 
-Upload this project or connect its repository and deploy the static files. The current `server.js` is for local preview only. Deployment is not performed automatically because no Cloudflare account authorization was supplied.
+The authorized project is documented in `supabase/schema.sql` for a clean deployment. Keep the service-role key server-side. Only a publishable/anon key may appear in a browser build, and only with matching RLS policies. The existing Supabase project has healthy security advisors and RLS-enabled tables.
 
 ## Android manual steps
 
-At this stage there are no required manual steps to preview the demo. For real accounts and persistence, configure Supabase as described above. For online payment, choose and verify a compliant provider first; no card fields are collected by this starter.
+For the public preview, no manual step is needed after Pages finishes deploying. For real accounts and persistence, configure Supabase Auth and connect the tested client flow. For online payment, choose and verify a compliant provider first; no card fields are collected by this starter.
