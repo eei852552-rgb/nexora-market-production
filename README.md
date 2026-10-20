@@ -37,3 +37,5 @@ Online payments are intentionally disabled. The app collects no card details and
 ## Launch disclosures
 
 `LAUNCH_DISCLOSURES.md` contains the current non-legal launch draft for privacy, terms, seller rules, delivery/returns, contact status, and controlled-launch disclosures. The website footer exposes the same notes. It intentionally states which business details are not configured instead of inventing an email, delivery promise, return policy, or legal claim.
+
+`QA_PROCEDURE.md` contains the safe confirmed-account test sequence and owner-controlled moderator setup. It does not create users, test fixtures, or admin roles automatically.
