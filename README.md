@@ -24,7 +24,7 @@ The database migrations are recorded in `supabase/auth-cart-cod.sql`, `supabase/
 
 ## Security and known configuration item
 
-The frontend never trusts a role flag for authorization. Database RLS/triggers enforce ownership, product status, stock, price, order ownership, seller approval, ad review, commission visibility, and COD RPC access. Supabase security advisors currently report one external Auth warning: **Leaked Password Protection is disabled**. Enabling it requires the Supabase Auth dashboard/management permission, which is not exposed by the current authorized MCP tools. It should be enabled before production account onboarding: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+The frontend never trusts a role flag for authorization. Database RLS/triggers enforce ownership, product status, stock, price, order ownership, seller approval, ad review, commission visibility, and COD RPC access. Supabase security advisors currently report one external Auth warning: **Leaked Password Protection is disabled**. The connected organization is on the Free plan, while Supabase documents this feature as available on Pro and above. It also requires an Owner/Administrator Dashboard or Management API permission, which is not exposed by the current authorized MCP tools. See `SUPABASE_AUTH_SECURITY.md` before production account onboarding: https://supabase.com/docs/guides/auth/password-security
 
 ## GitHub Pages
 

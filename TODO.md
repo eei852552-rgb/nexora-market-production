@@ -14,5 +14,5 @@
 - [x] Verify anonymous isolation, live empty-catalog behavior, demo separation, local server assets/routes, syntax, and browser Auth/password-reset entry points.
 - [ ] Complete signed-in cart/order browser test after Supabase email signup rate limit permits a confirmed QA account.
 - [ ] Publish at least one authorized real product before calling the live catalog populated.
-- [ ] Enable Supabase leaked-password protection through dashboard/management permission.
+- [ ] On an eligible Supabase plan, enable Leaked Password Protection from Auth settings and re-run Security Advisor; the current organization is Free and the connected MCP has no Auth-setting write operation.
 - [ ] Configure a Myanmar-compatible payment provider; online payments remain disabled.

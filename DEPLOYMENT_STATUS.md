@@ -21,7 +21,7 @@ The verified production URL is https://eei852552-rgb.github.io/nexora-market-pro
 
 ## Exact remaining blockers
 
-Supabase security advisors report one warning: `auth_leaked_password_protection` — leaked password protection is disabled. The current Supabase MCP exposes migrations and advisors but not Auth security-setting writes, so enabling it needs Supabase dashboard/management permission. This is a security hardening item, not a reason to weaken Auth or bypass rate limits.
+Supabase security advisors report one warning: `auth_leaked_password_protection` — leaked password protection is disabled. The project organization is on the Free plan, and official Supabase documentation says this feature is available on Pro and above. The current Supabase MCP exposes migrations and advisors but not Auth security-setting writes, so enabling it needs an eligible plan plus Owner/Administrator Dashboard or Management API permission. This is a security hardening item, not a reason to weaken Auth or bypass rate limits. Evidence and the exact manual path are recorded in `SUPABASE_AUTH_SECURITY.md`.
 
 A confirmed user session is still unavailable for a real signed-in cart/order end-to-end test because Auth email signup is rate-limited. The source and RLS paths are implemented, but that test remains explicitly unverified. There are currently no published products, so live checkout cannot be exercised with a real listing.
 
