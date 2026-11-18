@@ -31,14 +31,14 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $rls$
   select exists (
     select 1
     from public.order_items oi
     where oi.order_id = p_order_id
       and oi.seller_id = auth.uid()
   );
-$;
+$rls$;
 
 create or replace function private.is_order_buyer(p_order_id uuid)
 returns boolean
@@ -46,14 +46,14 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $rls$
   select exists (
     select 1
     from public.orders o
     where o.id = p_order_id
       and o.buyer_id = auth.uid()
   );
-$;
+$rls$;
 
 revoke all on function private.is_order_seller(uuid) from public, anon;
 revoke all on function private.is_order_buyer(uuid) from public, anon;
