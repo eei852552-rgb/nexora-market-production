@@ -1,6 +1,7 @@
 name: NEXORA COD branch checks
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - 'cod-idempotency-qa-*'
