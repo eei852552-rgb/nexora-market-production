@@ -75,14 +75,31 @@ begin
     );
   end if;
 
-  -- Lock existing cart rows in stable order. Snapshot only rows visible now.
-  perform c.product_id
-  from public.carts c
-  where c.user_id = v_user
-  order by c.product_id
-  for update;
+  -- Lock and snapshot cart rows in one statement. This prevents a new cart
+  -- row committed between a separate lock statement and snapshot statement
+  -- from being accidentally consumed by this checkout.
+  with locked_cart as materialized (
+    select c.product_id, c.quantity, c.updated_at
+    from public.carts c
+    where c.user_id = v_user
+    order by c.product_id
+    for update
+  )
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'product_id', lc.product_id,
+        'quantity', lc.quantity,
+        'updated_at', lc.updated_at
+      ) order by lc.product_id
+    ),
+    '[]'::jsonb
+  )
+  into v_cart_snapshot
+  from locked_cart lc;
 
-  -- A concurrent retry may have waited for the first request's cart locks.
+  -- Recheck after acquiring cart locks: another identical request may have
+  -- committed while this transaction waited for those locks.
   select o.id, o.total, o.status::text
     into v_order_id, v_total, v_status
   from public.orders o
@@ -98,20 +115,6 @@ begin
       'idempotent_replay', true
     );
   end if;
-
-  select coalesce(
-    jsonb_agg(
-      jsonb_build_object(
-        'product_id', c.product_id,
-        'quantity', c.quantity,
-        'updated_at', c.updated_at
-      ) order by c.product_id
-    ),
-    '[]'::jsonb
-  )
-  into v_cart_snapshot
-  from public.carts c
-  where c.user_id = v_user;
 
   v_cart_count := jsonb_array_length(v_cart_snapshot);
   if v_cart_count = 0 then
