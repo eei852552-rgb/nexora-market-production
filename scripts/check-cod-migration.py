@@ -4,8 +4,10 @@ import sys
 
 sql_path = Path("supabase/migrations/202611190001_cod_checkout_idempotency.sql")
 app_path = Path("app.js")
+hardening_path = Path("supabase/production-hardening.sql")
 sql = sql_path.read_text(encoding="utf-8").lower()
-app = app_path.read_text(encoding="utf-8")
+app = app_path.read_text(encoding="utf-8").lower()
+hardening = hardening_path.read_text(encoding="utf-8").lower()
 
 checks = {
     "request UUID stored on orders": bool(re.search(r"add column if not exists request_id uuid", sql)),
@@ -15,10 +17,14 @@ checks = {
     "request UUID required": "if p_request_id is null" in sql,
     "public wrapper is invoker": "security invoker" in sql,
     "direct order inserts revoked": "revoke insert on public.orders, public.order_items from anon, authenticated" in sql,
-    "cart snapshot includes updated_at": "'updated_at', c.updated_at" in sql,
+    "cart snapshot locks and captures rows atomically": "with locked_cart as materialized" in sql and "for update" in sql,
+    "cart snapshot includes updated_at": "'updated_at', lc.updated_at" in sql,
     "cart deletion matches snapshot version": "and updated_at = v_item.updated_at" in sql,
-    "frontend sends request UUID": "p_request_id: requestid" in app.lower(),
-    "frontend persists retry key": "sessionstorage.setitem(requeststoragekey, requestid)" in app.lower(),
+    "frontend sends request UUID": "p_request_id: requestid" in app,
+    "frontend persists retry key": "sessionstorage.setitem(requeststoragekey, requestid)" in app,
+    "existing order guard prerequisite": "create trigger trg_nexora_order_guard before insert on public.orders" in hardening,
+    "existing stock guard prerequisite": "create trigger trg_nexora_order_item_guard before insert on public.order_items" in hardening,
+    "existing order total trigger prerequisite": "create trigger trg_nexora_recalculate_order_total after insert or update or delete on public.order_items" in hardening,
 }
 for label, passed in checks.items():
     print(f'{"PASS" if passed else "FAIL"}: {label}')
