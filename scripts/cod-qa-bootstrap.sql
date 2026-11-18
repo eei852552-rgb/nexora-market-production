@@ -79,6 +79,10 @@ end $$;
 create trigger trg_nexora_recalculate_order_total after insert or update or delete on public.order_items
 for each row execute function public.nexora_recalculate_order_total();
 
+create or replace function public.create_cod_order(p_delivery_name text,p_delivery_phone text,p_delivery_address text)
+returns jsonb language sql security invoker set search_path=public as $ select '{}'::jsonb $;
+grant execute on function public.create_cod_order(text,text,text) to authenticated;
+
 grant usage on schema public, auth to authenticated;
 grant execute on function auth.uid() to authenticated;
 grant select, insert, update, delete on public.carts to authenticated;
