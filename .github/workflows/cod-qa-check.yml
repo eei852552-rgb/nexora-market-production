@@ -1,0 +1,29 @@
+name: NEXORA COD branch checks
+
+on:
+  push:
+    branches:
+      - 'cod-idempotency-qa-*'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app.js'
+      - 'server.js'
+      - 'package.json'
+      - 'supabase/migrations/**'
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: npm run check
