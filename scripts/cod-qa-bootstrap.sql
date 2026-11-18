@@ -1,4 +1,5 @@
 -- Disposable PostgreSQL fixture shaped from the live Supabase column metadata.
+-- COD trigger bodies below are copied from the current production definitions.
 -- This is CI-only and contains no production data.
 create extension if not exists pgcrypto;
 do $$ begin
@@ -42,40 +43,57 @@ create table public.order_items (
   quantity integer not null default 1, unit_price numeric not null, created_at timestamptz not null default now()
 );
 
-create or replace function public.nexora_order_guard() returns trigger
-language plpgsql security definer set search_path=public,private as $$
+create or replace function public.nexora_order_guard()
+returns trigger language plpgsql security definer set search_path=public,private
+as $function$
 begin
-  if new.buyer_id is distinct from auth.uid() then raise exception 'buyer_id must match authenticated user'; end if;
-  new.status := 'pending'; new.total := 0; new.currency := 'MMK'; return new;
-end $$;
+  if new.buyer_id is distinct from auth.uid() then
+    raise exception 'buyer_id must match the authenticated user';
+  end if;
+  new.status := 'pending';
+  new.total := 0;
+  new.currency := 'MMK';
+  return new;
+end;
+$function$;
 create trigger trg_nexora_order_guard before insert on public.orders
 for each row execute function public.nexora_order_guard();
 
-create or replace function public.nexora_order_item_guard() returns trigger
-language plpgsql security definer set search_path=public,private as $$
+create or replace function public.nexora_order_item_guard()
+returns trigger language plpgsql security definer set search_path=public,private
+as $function$
 declare p public.products;
 begin
   select * into p from public.products where id=new.product_id for update;
-  if not found or p.status <> 'published' then raise exception 'product is not available'; end if;
+  if not found or p.status <> 'published' then
+    raise exception 'product is not available';
+  end if;
   if new.seller_id is distinct from p.seller_id or new.unit_price is distinct from p.price then
     raise exception 'order item seller or price is invalid';
   end if;
-  if new.quantity <= 0 or p.stock is null or new.quantity > p.stock then raise exception 'insufficient stock'; end if;
+  if new.quantity <= 0 or p.stock is null or new.quantity > p.stock then
+    raise exception 'insufficient stock';
+  end if;
   update public.products set stock=stock-new.quantity, updated_at=now() where id=p.id;
   return new;
-end $$;
+end;
+$function$;
 create trigger trg_nexora_order_item_guard before insert on public.order_items
 for each row execute function public.nexora_order_item_guard();
 
-create or replace function public.nexora_recalculate_order_total() returns trigger
-language plpgsql security definer set search_path=public as $$
+create or replace function public.nexora_recalculate_order_total()
+returns trigger language plpgsql security definer set search_path=public
+as $function$
 declare oid uuid;
 begin
   oid := case when tg_op='DELETE' then old.order_id else new.order_id end;
-  update public.orders set total=coalesce((select sum(unit_price*quantity) from public.order_items where order_id=oid),0),
-    updated_at=now() where id=oid;
+  update public.orders
+  set total=coalesce((select sum(unit_price*quantity) from public.order_items where order_id=oid),0),
+      updated_at=now()
+  where id=oid;
   return case when tg_op='DELETE' then old else new end;
-end $$;
+end;
+$function$;
 create trigger trg_nexora_recalculate_order_total after insert or update or delete on public.order_items
 for each row execute function public.nexora_recalculate_order_total();
 
