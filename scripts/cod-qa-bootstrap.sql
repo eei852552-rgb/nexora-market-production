@@ -12,13 +12,13 @@ create or replace function auth.uid() returns uuid language sql stable as $$
 $$;
 create or replace function private.is_admin() returns boolean language sql stable as $$ select false $$;
 
+create table auth.users (id uuid primary key);
 create table public.profiles (
-  id uuid primary key, display_name text not null default '', bio text not null default '',
+  id uuid primary key references auth.users(id), display_name text not null default '', bio text not null default '',
   avatar_url text, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
-create table public.seller_profiles (id uuid primary key references public.profiles(id));
 create table public.products (
-  id uuid primary key default gen_random_uuid(), seller_id uuid not null references public.seller_profiles(id),
+  id uuid primary key default gen_random_uuid(), seller_id uuid not null references auth.users(id),
   name text not null, description text not null default '', price numeric not null,
   currency text not null default 'MMK', image_url text, category text not null default 'Other',
   status text not null default 'draft', created_at timestamptz not null default now(),
@@ -26,19 +26,19 @@ create table public.products (
   stock integer, is_featured boolean not null default false, icon text not null default '📦'
 );
 create table public.carts (
-  user_id uuid not null references public.profiles(id), product_id uuid not null references public.products(id),
+  user_id uuid not null references auth.users(id), product_id uuid not null references public.products(id),
   quantity integer not null default 1 check(quantity>0), updated_at timestamptz not null default now(),
   primary key(user_id,product_id)
 );
 create table public.orders (
-  id uuid primary key default gen_random_uuid(), buyer_id uuid not null references public.profiles(id),
+  id uuid primary key default gen_random_uuid(), buyer_id uuid not null references auth.users(id),
   status text not null default 'pending', total numeric not null default 0,
   currency text not null default 'MMK', shipping_note text not null default '',
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 create table public.order_items (
   id uuid primary key default gen_random_uuid(), order_id uuid not null references public.orders(id) on delete cascade,
-  product_id uuid not null references public.products(id), seller_id uuid not null references public.seller_profiles(id),
+  product_id uuid not null references public.products(id), seller_id uuid not null references auth.users(id),
   quantity integer not null default 1, unit_price numeric not null, created_at timestamptz not null default now()
 );
 
