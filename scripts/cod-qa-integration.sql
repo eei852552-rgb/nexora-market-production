@@ -80,6 +80,7 @@ begin
     where split_part(cfg, '=', 1) = 'search_path'
       and replace(split_part(cfg, '=', 2), '"', '') = ''
   ) into v_impl_definer,v_impl_empty_path
+  from pg_proc where oid='private.create_cod_order_impl(text,text,text,uuid)'::regprocedure;
   select prosecdef into v_wrapper_definer from pg_proc where oid='public.create_cod_order(text,text,text,uuid)'::regprocedure;
   if v_impl_definer is distinct from true or v_impl_empty_path is distinct from true then raise exception 'private implementation security settings are incorrect'; end if;
   if v_wrapper_definer is distinct from false then raise exception 'public wrapper must be SECURITY INVOKER'; end if;
