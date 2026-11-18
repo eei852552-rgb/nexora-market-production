@@ -140,8 +140,8 @@ function openCheckout() {
     errorBox.textContent = '';
     try {
       const result = await NexoraDB.rpc('create_cod_order', payload);
-      try { sessionStorage.removeItem(requestStorageKey); } catch {}
       await loadUserData();
+      try { sessionStorage.removeItem(requestStorageKey); } catch {}
       $('#drawer').innerHTML = `<div class="modal-bg"><div class="modal order-success"><strong>✓</strong><h2>Live order created</h2><p class="small">Order #${esc(String(result.order_id).slice(0,8))}<br>Cash on delivery · Supabase database<br>Total: ${money(result.total)}</p><button class="primary" id="seeOrder">View my orders</button></div></div>`;
       $('#seeOrder').onclick = () => { $('#drawer').innerHTML = ''; state.view = 'orders'; render(); };
     } catch (error) {
