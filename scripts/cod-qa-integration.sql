@@ -14,7 +14,8 @@ create temporary table qa_checkout_results (attempt text primary key, result jso
 
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
 select set_config('role','authenticated',false);
-select public.create_cod_order('QA Buyer','0912345678','QA test address 123456','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid) as first_result \gset
+insert into qa_checkout_results(attempt,result)
+select 'first', public.create_cod_order('QA Buyer','0912345678','QA test address 123456','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid);
 select set_config('role','none',false);
 
 do $$
@@ -32,7 +33,8 @@ end $$;
 
 -- Retry with the exact same request UUID must return the same order without stock/cart changes.
 select set_config('role','authenticated',false);
-select public.create_cod_order('QA Buyer','0912345678','QA test address 123456') as replay_result \gset
+insert into qa_checkout_results(attempt,result)
+select 'replay', public.create_cod_order('QA Buyer','0912345678','QA test address 123456','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid);
 select set_config('role','none',false);
 do $$
 declare v_orders int; v_items int; v_stock int; v_first uuid; v_replay uuid; v_replay_flag boolean;
