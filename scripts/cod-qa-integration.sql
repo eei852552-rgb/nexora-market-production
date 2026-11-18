@@ -77,7 +77,9 @@ begin
   if has_function_privilege('anon','public.create_cod_order(text,text,text,uuid)','EXECUTE') then raise exception 'anon can execute COD wrapper'; end if;
   select prosecdef, exists (
     select 1 from unnest(coalesce(proconfig, ARRAY[]::text[])) as cfg
-    where cfg ~ '^search_path=(\"\"|)
+    where split_part(cfg, '=', 1) = 'search_path'
+      and replace(split_part(cfg, '=', 2), '"', '') = ''
+  ) into v_impl_definer,v_impl_empty_path
   select prosecdef into v_wrapper_definer from pg_proc where oid='public.create_cod_order(text,text,text,uuid)'::regprocedure;
   if v_impl_definer is distinct from true or v_impl_empty_path is distinct from true then raise exception 'private implementation security settings are incorrect'; end if;
   if v_wrapper_definer is distinct from false then raise exception 'public wrapper must be SECURITY INVOKER'; end if;
