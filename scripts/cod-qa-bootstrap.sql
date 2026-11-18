@@ -97,6 +97,31 @@ $function$;
 create trigger trg_nexora_recalculate_order_total after insert or update or delete on public.order_items
 for each row execute function public.nexora_recalculate_order_total();
 
+-- Reproduce the live RLS shape, including the original mutually recursive
+-- seller-orders / participant-order-items policies. The COD migration must
+-- replace those policies with non-recursive private helper functions.
+alter table public.carts enable row level security;
+alter table public.orders enable row level security;
+alter table public.order_items enable row level security;
+
+create policy carts_owner_all on public.carts for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy orders_buyer_read on public.orders for select to authenticated
+  using (buyer_id = auth.uid());
+create policy sellers_can_view_relevant_orders on public.orders for select to authenticated
+  using (exists (
+    select 1 from public.order_items oi
+    where oi.order_id = orders.id and oi.seller_id = auth.uid()
+  ));
+create policy order_items_participant_read on public.order_items for select to authenticated
+  using (
+    seller_id = auth.uid()
+    or exists (
+      select 1 from public.orders o
+      where o.id = order_items.order_id and o.buyer_id = auth.uid()
+    )
+  );
+
 create or replace function public.create_cod_order(p_delivery_name text,p_delivery_phone text,p_delivery_address text)
 returns jsonb language sql security invoker set search_path=public as $codstub$ select '{}'::jsonb $codstub$;
 grant execute on function public.create_cod_order(text,text,text) to authenticated;
