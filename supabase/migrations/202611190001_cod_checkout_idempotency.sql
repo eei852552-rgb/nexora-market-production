@@ -1,5 +1,6 @@
 -- Retry-safe COD checkout and cart snapshot cleanup.
--- Apply only after reviewing this migration in the QA branch; do not run on production yet.
+-- Apply only to an isolated QA database after reviewing the current schema.
+-- This migration is NOT applied to the live Supabase project.
 
 alter table public.orders
   add column if not exists request_id uuid;
@@ -8,15 +9,20 @@ create unique index if not exists orders_buyer_request_id_uidx
   on public.orders (buyer_id, request_id)
   where request_id is not null;
 
--- Remove browser-side order creation. Checkout must go through the guarded RPC.
+-- Remove browser-side order creation. Checkout must use the guarded RPC only.
 drop policy if exists orders_buyer_insert on public.orders;
 drop policy if exists order_items_buyer_insert on public.order_items;
 revoke insert on public.orders, public.order_items from anon, authenticated;
 
--- Disable the former three-argument RPC so clients cannot bypass the idempotency key.
+-- PostgREST does not support overloaded function names. Replace the old 3-arg RPC.
 revoke all on function public.create_cod_order(text, text, text) from public, anon, authenticated;
+drop function public.create_cod_order(text, text, text);
 
-create or replace function public.create_cod_order(
+-- Keep the privileged implementation in a non-exposed schema.
+create schema if not exists private;
+grant usage on schema private to authenticated;
+
+create or replace function private.create_cod_order_impl(
   p_delivery_name text,
   p_delivery_phone text,
   p_delivery_address text,
@@ -25,15 +31,17 @@ create or replace function public.create_cod_order(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare
   v_user uuid := auth.uid();
   v_order_id uuid;
   v_total numeric;
   v_status text;
+  v_cart_snapshot jsonb;
   v_cart_count integer;
   v_processed_count integer := 0;
+  v_deleted_count integer;
   v_item record;
 begin
   if v_user is null then
@@ -50,10 +58,11 @@ begin
     raise exception 'delivery details are incomplete';
   end if;
 
-  -- Return the original order for a repeated request, even if its cart is now empty.
-  select id, total, status::text into v_order_id, v_total, v_status
-  from public.orders
-  where buyer_id = v_user and request_id = p_request_id;
+  -- Idempotent replay: return the original order for this buyer/request pair.
+  select o.id, o.total, o.status::text
+    into v_order_id, v_total, v_status
+  from public.orders o
+  where o.buyer_id = v_user and o.request_id = p_request_id;
 
   if found then
     return jsonb_build_object(
@@ -66,17 +75,18 @@ begin
     );
   end if;
 
-  -- Lock the buyer's current cart snapshot in stable order before creating the order.
+  -- Lock existing cart rows in stable order. Snapshot only rows visible now.
   perform c.product_id
   from public.carts c
   where c.user_id = v_user
   order by c.product_id
   for update;
 
-  -- A concurrent retry may have waited while the first request consumed the cart.
-  select id, total, status::text into v_order_id, v_total, v_status
-  from public.orders
-  where buyer_id = v_user and request_id = p_request_id;
+  -- A concurrent retry may have waited for the first request's cart locks.
+  select o.id, o.total, o.status::text
+    into v_order_id, v_total, v_status
+  from public.orders o
+  where o.buyer_id = v_user and o.request_id = p_request_id;
 
   if found then
     return jsonb_build_object(
@@ -89,15 +99,26 @@ begin
     );
   end if;
 
-  select count(*) into v_cart_count
-  from public.carts
-  where user_id = v_user;
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'product_id', c.product_id,
+        'quantity', c.quantity,
+        'updated_at', c.updated_at
+      ) order by c.product_id
+    ),
+    '[]'::jsonb
+  )
+  into v_cart_snapshot
+  from public.carts c
+  where c.user_id = v_user;
 
+  v_cart_count := jsonb_array_length(v_cart_snapshot);
   if v_cart_count = 0 then
     raise exception 'cart is empty';
   end if;
 
-  -- The partial unique index makes concurrent retries converge on one order.
+  -- Unique index prevents duplicate orders even under concurrent requests.
   insert into public.orders (buyer_id, request_id, status, total, currency, shipping_note)
   values (
     v_user,
@@ -115,9 +136,10 @@ begin
   returning id into v_order_id;
 
   if v_order_id is null then
-    select id, total, status::text into v_order_id, v_total, v_status
-    from public.orders
-    where buyer_id = v_user and request_id = p_request_id;
+    select o.id, o.total, o.status::text
+      into v_order_id, v_total, v_status
+    from public.orders o
+    where o.buyer_id = v_user and o.request_id = p_request_id;
 
     if v_order_id is null then
       raise exception 'checkout request could not be resolved';
@@ -133,23 +155,32 @@ begin
     );
   end if;
 
+  -- Process only the captured cart snapshot; later cart additions are untouched.
   for v_item in
-    select c.product_id, c.quantity, c.updated_at, p.seller_id, p.price
-    from public.carts c
-    join public.products p on p.id = c.product_id
-    where c.user_id = v_user
-    order by c.product_id
-    for update of c
+    select
+      (item.value->>'product_id')::uuid as product_id,
+      (item.value->>'quantity')::integer as quantity,
+      (item.value->>'updated_at')::timestamptz as updated_at,
+      p.seller_id,
+      p.price
+    from jsonb_array_elements(v_cart_snapshot) as item(value)
+    join public.products p
+      on p.id = (item.value->>'product_id')::uuid
+    order by (item.value->>'product_id')::uuid
   loop
     insert into public.order_items (order_id, product_id, seller_id, quantity, unit_price)
     values (v_order_id, v_item.product_id, v_item.seller_id, v_item.quantity, v_item.price);
 
-    -- Delete only the exact cart row snapshot consumed by this order.
     delete from public.carts
     where user_id = v_user
       and product_id = v_item.product_id
       and quantity = v_item.quantity
       and updated_at = v_item.updated_at;
+
+    get diagnostics v_deleted_count = row_count;
+    if v_deleted_count <> 1 then
+      raise exception 'cart changed during checkout; retry the request';
+    end if;
 
     v_processed_count := v_processed_count + 1;
   end loop;
@@ -158,9 +189,9 @@ begin
     raise exception 'one or more cart products are unavailable';
   end if;
 
-  select total into v_total
-  from public.orders
-  where id = v_order_id and buyer_id = v_user;
+  select o.total into v_total
+  from public.orders o
+  where o.id = v_order_id and o.buyer_id = v_user;
 
   return jsonb_build_object(
     'order_id', v_order_id,
@@ -171,6 +202,24 @@ begin
     'idempotent_replay', false
   );
 end;
+$$;
+
+revoke all on function private.create_cod_order_impl(text, text, text, uuid) from public, anon;
+grant execute on function private.create_cod_order_impl(text, text, text, uuid) to authenticated;
+
+-- Exposed RPC wrapper is SECURITY INVOKER and delegates to the private implementation.
+create or replace function public.create_cod_order(
+  p_delivery_name text,
+  p_delivery_phone text,
+  p_delivery_address text,
+  p_request_id uuid
+)
+returns jsonb
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.create_cod_order_impl($1, $2, $3, $4);
 $$;
 
 revoke all on function public.create_cod_order(text, text, text, uuid) from public, anon;
