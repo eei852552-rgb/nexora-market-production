@@ -1,10 +1,13 @@
 -- Functional smoke tests against the disposable PostgreSQL fixture.
 \set ON_ERROR_STOP on
+insert into auth.users(id) values
+ ('11111111-1111-4111-8111-111111111111'),
+ ('22222222-2222-4222-8222-222222222222'),
+ ('33333333-3333-4333-8333-333333333333');
 insert into public.profiles(id,display_name) values
  ('11111111-1111-4111-8111-111111111111','QA Buyer'),
  ('22222222-2222-4222-8222-222222222222','Other Buyer'),
  ('33333333-3333-4333-8333-333333333333','QA Seller');
-insert into public.seller_profiles(id) values ('33333333-3333-4333-8333-333333333333');
 insert into public.products(id,seller_id,name,price,stock,status)
 values ('44444444-4444-4444-8444-444444444444','33333333-3333-4333-8333-333333333333','QA item',1250,10,'published');
 insert into public.carts(user_id,product_id,quantity)
