@@ -29,3 +29,36 @@ jobs:
         run: npm run check
       - name: Check COD migration safety invariants
         run: python scripts/check-cod-migration.py
+
+  postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: qa-only-password
+          POSTGRES_DB: nexora_qa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nexora_qa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Bootstrap disposable schema matching live column metadata
+        env:
+          PGPASSWORD: qa-only-password
+        run: psql -h localhost -U postgres -d nexora_qa -v ON_ERROR_STOP=1 -f scripts/cod-qa-bootstrap.sql
+      - name: Apply COD migration to disposable PostgreSQL only
+        env:
+          PGPASSWORD: qa-only-password
+        run: psql -h localhost -U postgres -d nexora_qa -v ON_ERROR_STOP=1 -f supabase/migrations/202611190001_cod_checkout_idempotency.sql
+      - name: Run COD retry and privilege integration checks
+        env:
+          PGPASSWORD: qa-only-password
+        run: psql -h localhost -U postgres -d nexora_qa -v ON_ERROR_STOP=1 -f scripts/cod-qa-integration.sql
