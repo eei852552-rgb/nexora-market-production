@@ -51,7 +51,7 @@ begin
   end if;
 
   -- Return the original order for a repeated request, even if its cart is now empty.
-  select id, total, status into v_order_id, v_total, v_status
+  select id, total, status::text into v_order_id, v_total, v_status
   from public.orders
   where buyer_id = v_user and request_id = p_request_id;
 
@@ -74,7 +74,7 @@ begin
   for update;
 
   -- A concurrent retry may have waited while the first request consumed the cart.
-  select id, total, status into v_order_id, v_total, v_status
+  select id, total, status::text into v_order_id, v_total, v_status
   from public.orders
   where buyer_id = v_user and request_id = p_request_id;
 
@@ -115,7 +115,7 @@ begin
   returning id into v_order_id;
 
   if v_order_id is null then
-    select id, total, status into v_order_id, v_total, v_status
+    select id, total, status::text into v_order_id, v_total, v_status
     from public.orders
     where buyer_id = v_user and request_id = p_request_id;
 
