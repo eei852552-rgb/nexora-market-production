@@ -31,6 +31,7 @@ declare
   v_user uuid := auth.uid();
   v_order_id uuid;
   v_total numeric;
+  v_status text;
   v_cart_count integer;
   v_processed_count integer := 0;
   v_item record;
@@ -50,7 +51,7 @@ begin
   end if;
 
   -- Return the original order for a repeated request, even if its cart is now empty.
-  select id, total into v_order_id, v_total
+  select id, total, status into v_order_id, v_total, v_status
   from public.orders
   where buyer_id = v_user and request_id = p_request_id;
 
@@ -59,7 +60,7 @@ begin
       'order_id', v_order_id,
       'total', v_total,
       'currency', 'MMK',
-      'status', 'pending',
+      'status', v_status,
       'payment_method', 'cod',
       'idempotent_replay', true
     );
@@ -71,6 +72,22 @@ begin
   where c.user_id = v_user
   order by c.product_id
   for update;
+
+  -- A concurrent retry may have waited while the first request consumed the cart.
+  select id, total, status into v_order_id, v_total, v_status
+  from public.orders
+  where buyer_id = v_user and request_id = p_request_id;
+
+  if found then
+    return jsonb_build_object(
+      'order_id', v_order_id,
+      'total', v_total,
+      'currency', 'MMK',
+      'status', v_status,
+      'payment_method', 'cod',
+      'idempotent_replay', true
+    );
+  end if;
 
   select count(*) into v_cart_count
   from public.carts
@@ -98,7 +115,7 @@ begin
   returning id into v_order_id;
 
   if v_order_id is null then
-    select id, total into v_order_id, v_total
+    select id, total, status into v_order_id, v_total, v_status
     from public.orders
     where buyer_id = v_user and request_id = p_request_id;
 
@@ -110,7 +127,7 @@ begin
       'order_id', v_order_id,
       'total', v_total,
       'currency', 'MMK',
-      'status', 'pending',
+      'status', v_status,
       'payment_method', 'cod',
       'idempotent_replay', true
     );
