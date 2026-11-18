@@ -66,12 +66,27 @@ do $$ begin
 end $$;
 select set_config('role','none',false);
 
+-- Verify wrapper/implementation grants and SECURITY modes.
+do $$
+declare v_impl_definer boolean; v_impl_empty_path boolean; v_wrapper_definer boolean;
+begin
+  if not has_schema_privilege('authenticated','private','USAGE') then raise exception 'authenticated lacks private schema usage'; end if;
+  if not has_function_privilege('authenticated','private.create_cod_order_impl(text,text,text,uuid)','EXECUTE') then raise exception 'authenticated cannot execute private implementation'; end if;
+  if has_function_privilege('anon','private.create_cod_order_impl(text,text,text,uuid)','EXECUTE') then raise exception 'anon can execute private implementation'; end if;
+  if not has_function_privilege('authenticated','public.create_cod_order(text,text,text,uuid)','EXECUTE') then raise exception 'authenticated cannot execute COD wrapper'; end if;
+  if has_function_privilege('anon','public.create_cod_order(text,text,text,uuid)','EXECUTE') then raise exception 'anon can execute COD wrapper'; end if;
+  select prosecdef, coalesce(proconfig,'{}') @> ARRAY['search_path='] into v_impl_definer,v_impl_empty_path
+  from pg_proc where oid='private.create_cod_order_impl(text,text,text,uuid)'::regprocedure;
+  select prosecdef into v_wrapper_definer from pg_proc where oid='public.create_cod_order(text,text,text,uuid)'::regprocedure;
+  if v_impl_definer is distinct from true or v_impl_empty_path is distinct from true then raise exception 'private implementation security settings are incorrect'; end if;
+  if v_wrapper_definer is distinct from false then raise exception 'public wrapper must be SECURITY INVOKER'; end if;
+end $$;
+
 -- Direct authenticated order/order-item INSERT must be revoked.
 do $$
 begin
   if has_table_privilege('authenticated','public.orders','INSERT') then raise exception 'authenticated can directly insert orders'; end if;
   if has_table_privilege('authenticated','public.order_items','INSERT') then raise exception 'authenticated can directly insert order_items'; end if;
-  if not has_function_privilege('authenticated','public.create_cod_order(text,text,text,uuid)','EXECUTE') then raise exception 'authenticated cannot execute COD RPC'; end if;
 end $$;
 
 \echo 'PASS: COD runtime smoke tests'
