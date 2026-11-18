@@ -2,12 +2,15 @@
 \set ON_ERROR_STOP on
 insert into public.profiles(id,display_name) values
  ('11111111-1111-4111-8111-111111111111','QA Buyer'),
- ('22222222-2222-4222-8222-222222222222','Other Buyer');
+ ('22222222-2222-4222-8222-222222222222','Other Buyer'),
+ ('33333333-3333-4333-8333-333333333333','QA Seller');
 insert into public.seller_profiles(id) values ('33333333-3333-4333-8333-333333333333');
 insert into public.products(id,seller_id,name,price,stock,status)
 values ('44444444-4444-4444-8444-444444444444','33333333-3333-4333-8333-333333333333','QA item',1250,10,'published');
 insert into public.carts(user_id,product_id,quantity)
 values ('11111111-1111-4111-8111-111111111111','44444444-4444-4444-8444-444444444444',2);
+
+create temporary table qa_checkout_results (attempt text primary key, result jsonb not null);
 
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
 select set_config('role','authenticated',false);
@@ -32,8 +35,11 @@ select set_config('role','authenticated',false);
 select public.create_cod_order('QA Buyer','0912345678','QA test address 123456') as replay_result \gset
 select set_config('role','none',false);
 do $$
-declare v_orders int; v_items int; v_stock int;
+declare v_orders int; v_items int; v_stock int; v_first uuid; v_replay uuid; v_replay_flag boolean;
 begin
+  select (result->>'order_id')::uuid into v_first from qa_checkout_results where attempt='first';
+  select (result->>'order_id')::uuid, (result->>'idempotent_replay')::boolean into v_replay, v_replay_flag from qa_checkout_results where attempt='replay';
+  if v_first is distinct from v_replay or v_replay_flag is distinct from true then raise exception 'retry did not return the original order'; end if;
   select count(*) into v_orders from public.orders where buyer_id='11111111-1111-4111-8111-111111111111';
   select count(*) into v_items from public.order_items;
   select stock into v_stock from public.products where id='44444444-4444-4444-8444-444444444444';
