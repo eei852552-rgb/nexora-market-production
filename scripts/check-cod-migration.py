@@ -31,7 +31,7 @@ checks = {
     "QA fixture matches live auth.users foreign keys": fixture.count("references auth.users(id)") >= 5 and "seller_profiles" not in fixture,
     "QA test seeds auth users before profiles": "insert into auth.users(id)" in integration,
     "QA tests private schema and function grants": "has_schema_privilege('authenticated','private','usage')" in integration and "has_function_privilege('anon','private.create_cod_order_impl(text,text,text,uuid)','execute')" in integration,
-    "QA tests SECURITY DEFINER implementation with empty search path": "v_impl_definer" in integration and "search_path=" in integration,
+    "QA tests SECURITY DEFINER implementation with empty search path": "v_impl_definer" in integration and "split_part(cfg" in integration and "search_path" in integration,
     "QA tests SECURITY INVOKER wrapper": "v_wrapper_definer" in integration,
     "existing order guard prerequisite": "create trigger trg_nexora_order_guard before insert on public.orders" in hardening,
     "existing stock guard prerequisite": "create trigger trg_nexora_order_item_guard before insert on public.order_items" in hardening,
