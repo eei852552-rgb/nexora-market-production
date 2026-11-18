@@ -22,6 +22,57 @@ drop function public.create_cod_order(text, text, text);
 create schema if not exists private;
 grant usage on schema private to authenticated;
 
+-- Avoid mutually recursive RLS policies between orders and order_items.
+-- These narrowly scoped helpers run as the migration owner and use auth.uid()
+-- to answer one ownership/participation question without exposing row data.
+create or replace function private.is_order_seller(p_order_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $
+  select exists (
+    select 1
+    from public.order_items oi
+    where oi.order_id = p_order_id
+      and oi.seller_id = auth.uid()
+  );
+$;
+
+create or replace function private.is_order_buyer(p_order_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $
+  select exists (
+    select 1
+    from public.orders o
+    where o.id = p_order_id
+      and o.buyer_id = auth.uid()
+  );
+$;
+
+revoke all on function private.is_order_seller(uuid) from public, anon;
+revoke all on function private.is_order_buyer(uuid) from public, anon;
+grant execute on function private.is_order_seller(uuid) to authenticated;
+grant execute on function private.is_order_buyer(uuid) to authenticated;
+
+drop policy if exists sellers_can_view_relevant_orders on public.orders;
+create policy sellers_can_view_relevant_orders
+  on public.orders for select to authenticated
+  using (private.is_order_seller(id));
+
+drop policy if exists order_items_participant_read on public.order_items;
+create policy order_items_participant_read
+  on public.order_items for select to authenticated
+  using (
+    seller_id = (select auth.uid())
+    or private.is_order_buyer(order_id)
+  );
+
 create or replace function private.create_cod_order_impl(
   p_delivery_name text,
   p_delivery_phone text,
