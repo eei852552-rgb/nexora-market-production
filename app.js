@@ -140,8 +140,21 @@ function openCheckout() {
     errorBox.textContent = '';
     try {
       const result = await NexoraDB.rpc('create_cod_order', payload);
+      state.error = '';
       await loadUserData();
+      if (state.error) {
+        errorBox.textContent = `Order #${esc(String(result.order_id).slice(0,8))} was accepted, but account data could not refresh. Reload your account before starting another checkout.`;
+        button.disabled = false;
+        return;
+      }
+      const replayWithNewCart = result.idempotent_replay === true && state.cart.length > 0;
       try { sessionStorage.removeItem(requestStorageKey); } catch {}
+      if (replayWithNewCart) {
+        $('#drawer').innerHTML = `<div class="modal-bg"><div class="modal order-success"><strong>✓</strong><h2>Previous order already confirmed</h2><p class="small">Order #${esc(String(result.order_id).slice(0,8))} was already created. Your current cart still has items and was not submitted as a new order.</p><button class="primary" id="reviewCurrentCart">Review current cart</button><button class="secondary" id="seeOrder">View my orders</button></div></div>`;
+        $('#reviewCurrentCart').onclick = () => { $('#drawer').innerHTML = ''; openCart(); };
+        $('#seeOrder').onclick = () => { $('#drawer').innerHTML = ''; state.view = 'orders'; render(); };
+        return;
+      }
       $('#drawer').innerHTML = `<div class="modal-bg"><div class="modal order-success"><strong>✓</strong><h2>Live order created</h2><p class="small">Order #${esc(String(result.order_id).slice(0,8))}<br>Cash on delivery · Supabase database<br>Total: ${money(result.total)}</p><button class="primary" id="seeOrder">View my orders</button></div></div>`;
       $('#seeOrder').onclick = () => { $('#drawer').innerHTML = ''; state.view = 'orders'; render(); };
     } catch (error) {
