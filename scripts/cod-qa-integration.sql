@@ -11,7 +11,7 @@ values ('11111111-1111-4111-8111-111111111111','44444444-4444-4444-8444-44444444
 
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
 select set_config('role','authenticated',false);
-select public.create_cod_order('QA Buyer','0912345678','QA test address 123456') as first_result \gset
+select public.create_cod_order('QA Buyer','0912345678','QA test address 123456','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid) as first_result \gset
 select set_config('role','none',false);
 
 do $$
@@ -45,7 +45,7 @@ select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222'
 select set_config('role','authenticated',false);
 do $$ begin
   begin
-    perform public.create_cod_order('Other Buyer','0912345678','QA test address 123456');
+    perform public.create_cod_order('Other Buyer','0912345678','QA test address 123456','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid);
     raise exception 'expected empty cart failure';
   exception when others then
     if sqlerrm='expected empty cart failure' then raise; end if;
