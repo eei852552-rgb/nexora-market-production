@@ -52,19 +52,126 @@ begin
   if v_orders<>1 or v_items<>1 or v_stock<>8 then raise exception 'idempotent replay duplicated effects'; end if;
 end $$;
 
--- A different buyer cannot replay the first buyer's request; with no cart it must fail.
+-- Failure paths must roll back completely and preserve the cart and stock.
+insert into public.products(id,seller_id,name,description,price,currency,category,status,stock)
+values
+ ('66666666-6666-4666-8666-666666666666','33333333-3333-4333-8333-333333333333','Low stock QA item','CI fixture',500,'MMK','Other','published',1),
+ ('77777777-7777-4777-8777-777777777777','33333333-3333-4333-8333-333333333333','Draft QA item','CI fixture',750,'MMK','Other','draft',5);
+insert into public.carts(user_id,product_id,quantity) values
+ ('11111111-1111-4111-8111-111111111111','66666666-6666-4666-8666-666666666666',2),
+ ('11111111-1111-4111-8111-111111111111','77777777-7777-4777-8777-777777777777',1);
+
+select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
+select set_config('role','authenticated',false);
+do $failure$
+begin
+  begin
+    perform public.create_cod_order('', '0912345678', 'QA test address 123456',
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd'::uuid);
+    raise exception 'expected delivery validation failure';
+  exception when others then
+    if sqlerrm='expected delivery validation failure' then raise; end if;
+    if sqlerrm not like '%delivery details are incomplete%' then raise; end if;
+  end;
+  begin
+    perform public.create_cod_order('QA Buyer', '0912345678', 'QA test address 123456', null);
+    raise exception 'expected missing request ID failure';
+  exception when others then
+    if sqlerrm='expected missing request ID failure' then raise; end if;
+    if sqlerrm not like '%checkout request ID is required%' then raise; end if;
+  end;
+  begin
+    perform public.create_cod_order('QA Buyer', '0912345678', 'QA test address 123456',
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid);
+    raise exception 'expected insufficient stock failure';
+  exception when others then
+    if sqlerrm='expected insufficient stock failure' then raise; end if;
+    if sqlerrm not like '%insufficient stock%' then raise; end if;
+  end;
+end
+$failure$;
+select set_config('role','none',false);
+
+do $rollback$
+declare v_low_stock integer; v_draft_stock integer; v_cart_rows integer; v_orders integer; v_items integer;
+begin
+  select stock into v_low_stock from public.products where id='66666666-6666-4666-8666-666666666666';
+  select stock into v_draft_stock from public.products where id='77777777-7777-4777-8777-777777777777';
+  select count(*) into v_cart_rows from public.carts
+    where user_id='11111111-1111-4111-8111-111111111111'
+      and product_id in ('66666666-6666-4666-8666-666666666666','77777777-7777-4777-8777-777777777777');
+  select count(*) into v_orders from public.orders
+    where request_id in (
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    );
+  select count(*) into v_items from public.order_items
+    where product_id in ('66666666-6666-4666-8666-666666666666','77777777-7777-4777-8777-777777777777');
+  if v_low_stock<>1 or v_draft_stock<>5 or v_cart_rows<>2 or v_orders<>0 or v_items<>0 then
+    raise exception 'failed COD attempts were not atomic: low stock %, draft stock %, cart rows %, orders %, items %',
+      v_low_stock,v_draft_stock,v_cart_rows,v_orders,v_items;
+  end if;
+end
+$rollback$;
+
+-- An unavailable/draft product must also fail atomically.
+delete from public.carts
+where user_id='11111111-1111-4111-8111-111111111111'
+  and product_id='66666666-6666-4666-8666-666666666666';
+select set_config('role','authenticated',false);
+do $unavailable$
+begin
+  begin
+    perform public.create_cod_order('QA Buyer', '0912345678', 'QA test address 123456',
+      'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'::uuid);
+    raise exception 'expected unavailable product failure';
+  exception when others then
+    if sqlerrm='expected unavailable product failure' then raise; end if;
+    if sqlerrm not like '%product is not available%' then raise; end if;
+  end;
+end
+$unavailable$;
+select set_config('role','none',false);
+do $unavailable_check$
+begin
+  if (select count(*) from public.orders where request_id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')<>0
+     or (select count(*) from public.order_items where product_id='77777777-7777-4777-8777-777777777777')<>0
+     or (select stock from public.products where id='77777777-7777-4777-8777-777777777777')<>5
+     or (select count(*) from public.carts where user_id='11111111-1111-4111-8111-111111111111'
+         and product_id='77777777-7777-4777-8777-777777777777')<>1 then
+    raise exception 'unavailable product failure was not atomic';
+  end if;
+end
+$unavailable_check$;
+delete from public.carts
+where user_id='11111111-1111-4111-8111-111111111111'
+  and product_id='77777777-7777-4777-8777-777777777777';
+
+-- A second buyer using the same UUID must create their own order, never replay
+-- the first buyer's order. The unique key is scoped to (buyer_id, request_id).
+insert into public.carts(user_id,product_id,quantity)
+values ('22222222-2222-4222-8222-222222222222','44444444-4444-4444-8444-444444444444',1);
 select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
 select set_config('role','authenticated',false);
-do $$ begin
-  begin
-    perform public.create_cod_order('Other Buyer','0912345678','QA test address 123456','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid);
-    raise exception 'expected empty cart failure';
-  exception when others then
-    if sqlerrm='expected empty cart failure' then raise; end if;
-    if sqlerrm not like '%cart is empty%' then raise; end if;
-  end;
-end $$;
+insert into qa_checkout_results(attempt,result)
+select 'other_buyer_same_request',
+  public.create_cod_order('Other Buyer','0912345678','QA test address 123456',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid);
 select set_config('role','none',false);
+do $buyer_scope$
+declare v_first uuid; v_other uuid; v_orders integer; v_stock integer; v_cart integer;
+begin
+  select (result->>'order_id')::uuid into v_first from qa_checkout_results where attempt='first';
+  select (result->>'order_id')::uuid into v_other from qa_checkout_results where attempt='other_buyer_same_request';
+  select count(*) into v_orders from public.orders where buyer_id='22222222-2222-4222-8222-222222222222';
+  select stock into v_stock from public.products where id='44444444-4444-4444-8444-444444444444';
+  select count(*) into v_cart from public.carts where user_id='22222222-2222-4222-8222-222222222222';
+  if v_first is null or v_other is null or v_first=v_other or v_orders<>1 or v_stock<>7 or v_cart<>0 then
+    raise exception 'request UUID was not scoped to buyer: first %, other %, orders %, stock %, cart %',
+      v_first,v_other,v_orders,v_stock,v_cart;
+  end if;
+end
+$buyer_scope$;
 
 -- Verify wrapper/implementation grants and SECURITY modes.
 do $$
@@ -145,16 +252,8 @@ begin
   end if;
 end $acl$;
 
--- Seed a second buyer order and carts as the fixture owner, then exercise
--- the actual post-migration RLS policies under each authenticated identity.
-select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
-insert into public.orders(buyer_id,shipping_note)
-values ('22222222-2222-4222-8222-222222222222','QA second buyer order');
-insert into public.order_items(order_id,product_id,seller_id,quantity,unit_price)
-select o.id,p.id,p.seller_id,1,p.price
-from public.orders o
-join public.products p on p.id='44444444-4444-4444-8444-444444444444'
-where o.buyer_id='22222222-2222-4222-8222-222222222222';
+-- The two buyer orders were created through the COD RPC above.
+-- Add fresh owner-scoped carts, then exercise the actual RLS policies.
 insert into public.carts(user_id,product_id,quantity) values
  ('11111111-1111-4111-8111-111111111111','44444444-4444-4444-8444-444444444444',1),
  ('22222222-2222-4222-8222-222222222222','44444444-4444-4444-8444-444444444444',1);
