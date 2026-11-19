@@ -86,11 +86,11 @@ begin
 end $$;
 
 -- Direct authenticated order/order-item INSERT must be revoked.
-do $
+do $rls$
 begin
   if has_table_privilege('authenticated','public.orders','INSERT') then raise exception 'authenticated can directly insert orders'; end if;
   if has_table_privilege('authenticated','public.order_items','INSERT') then raise exception 'authenticated can directly insert order_items'; end if;
-end $;
+end $rls$;
 
 -- Seed a second buyer order and carts as the fixture owner, then exercise
 -- the actual post-migration RLS policies under each authenticated identity.
@@ -109,7 +109,7 @@ insert into public.carts(user_id,product_id,quantity) values
 -- Buyer one sees only their own order, items, and cart.
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
 select set_config('role','authenticated',false);
-do $
+do $rls$
 declare n_orders int; n_items int; n_carts int;
 begin
   select count(*) into n_orders from public.orders;
@@ -118,13 +118,13 @@ begin
   if n_orders<>1 or n_items<>1 or n_carts<>1 then
     raise exception 'buyer one RLS isolation failed: orders %, items %, carts %',n_orders,n_items,n_carts;
   end if;
-end $;
+end $rls$;
 select set_config('role','none',false);
 
 -- Buyer two sees only their own order, items, and cart.
 select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
 select set_config('role','authenticated',false);
-do $
+do $rls$
 declare n_orders int; n_items int; n_carts int;
 begin
   select count(*) into n_orders from public.orders;
@@ -133,13 +133,13 @@ begin
   if n_orders<>1 or n_items<>1 or n_carts<>1 then
     raise exception 'buyer two RLS isolation failed: orders %, items %, carts %',n_orders,n_items,n_carts;
   end if;
-end $;
+end $rls$;
 select set_config('role','none',false);
 
 -- The seller sees both relevant orders/items, but neither buyer's cart.
 select set_config('request.jwt.claim.sub','33333333-3333-4333-8333-333333333333',false);
 select set_config('role','authenticated',false);
-do $
+do $rls$
 declare n_orders int; n_items int; n_carts int;
 begin
   select count(*) into n_orders from public.orders;
@@ -148,12 +148,12 @@ begin
   if n_orders<>2 or n_items<>2 or n_carts<>0 then
     raise exception 'seller RLS visibility failed: orders %, items %, carts %',n_orders,n_items,n_carts;
   end if;
-end $;
+end $rls$;
 select set_config('role','none',false);
 
 -- The policy helpers must be callable only by authenticated users and remain
 -- SECURITY DEFINER with an empty search_path.
-do $
+do $rls$
 declare seller_definer boolean; buyer_definer boolean;
 begin
   if has_function_privilege('anon','private.is_order_seller(uuid)','EXECUTE')
@@ -167,6 +167,6 @@ begin
   if seller_definer is distinct from true or buyer_definer is distinct from true then
     raise exception 'RLS helper functions must be SECURITY DEFINER';
   end if;
-end $;
+end $rls$;
 
 \echo 'PASS: COD runtime smoke tests'
