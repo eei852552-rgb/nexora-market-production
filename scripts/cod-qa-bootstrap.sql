@@ -128,5 +128,9 @@ grant execute on function public.create_cod_order(text,text,text) to authenticat
 
 grant usage on schema public, auth to authenticated;
 grant execute on function auth.uid() to authenticated;
-grant select, insert, update, delete on public.carts to authenticated;
-grant select on public.orders, public.order_items, public.products to authenticated;
+
+-- Simulate broad default table grants seen on a newly created Supabase QA project.
+-- The two candidate migrations must reduce these to least privilege.
+grant all privileges on table
+  public.orders, public.order_items, public.carts, public.products
+to public, anon, authenticated;
