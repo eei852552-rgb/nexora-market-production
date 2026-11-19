@@ -154,18 +154,27 @@ select set_config('role','none',false);
 -- The policy helpers must be callable only by authenticated users and remain
 -- SECURITY DEFINER with an empty search_path.
 do $rls$
-declare seller_definer boolean; buyer_definer boolean;
+declare
+  seller_definer boolean;
+  buyer_definer boolean;
+  seller_empty_path boolean;
+  buyer_empty_path boolean;
 begin
   if has_function_privilege('anon','private.is_order_seller(uuid)','EXECUTE')
      or has_function_privilege('anon','private.is_order_buyer(uuid)','EXECUTE') then
     raise exception 'anon can execute private RLS helpers';
   end if;
-  select prosecdef into seller_definer from pg_proc
-    where oid='private.is_order_seller(uuid)'::regprocedure;
-  select prosecdef into buyer_definer from pg_proc
-    where oid='private.is_order_buyer(uuid)'::regprocedure;
+  select prosecdef, proconfig[1] = 'search_path=""'
+    into seller_definer, seller_empty_path
+    from pg_proc where oid='private.is_order_seller(uuid)'::regprocedure;
+  select prosecdef, proconfig[1] = 'search_path=""'
+    into buyer_definer, buyer_empty_path
+    from pg_proc where oid='private.is_order_buyer(uuid)'::regprocedure;
   if seller_definer is distinct from true or buyer_definer is distinct from true then
     raise exception 'RLS helper functions must be SECURITY DEFINER';
+  end if;
+  if seller_empty_path is distinct from true or buyer_empty_path is distinct from true then
+    raise exception 'RLS helper functions must have an empty search_path';
   end if;
 end $rls$;
 
