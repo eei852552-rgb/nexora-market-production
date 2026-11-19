@@ -23,3 +23,12 @@ This change is prepared on branch `cod-idempotency-qa-20261119`. The migration i
 ## Production gate
 
 Do not apply this migration to the production Supabase project or deploy this branch until QA passes, the migration is reviewed against the live schema, and the project owner explicitly approves the production change. The main branch and current live deployment remain unchanged by this branch.
+
+
+## Current environment and verification boundary
+
+- The feature branch's `config.js` points to the separate Supabase project `nexora-market-qa`; it is not the production project.
+- A read-only Supabase audit confirmed the QA project is active, has the COD request-ID column and unique index, and has the four-argument public RPC plus private implementation/RLS helpers. Its current orders, order items, carts, products, and profiles tables contain zero rows.
+- The QA project currently has broad default table grants on its public tables, including `TRUNCATE` on COD-related tables. RLS does not block `TRUNCATE`. Do not use this project for browser/authenticated QA or create fixtures until an owner reviews and applies `scripts/qa-project-acl-hardening.sql`, then verifies the resulting grants.
+- The CI workflow uses a disposable PostgreSQL 16 service. Its tests are local/CI database tests, not proof of Supabase Auth/PostgREST behavior or production verification.
+- No QA account, seller role, product, cart, or order has been created in the Supabase QA project. Production data and the live deployment remain untouched.
