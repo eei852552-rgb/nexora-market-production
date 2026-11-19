@@ -37,6 +37,7 @@ checks = {
     "QA enables RLS on COD tables": "enable row level security" in fixture,
     "QA tests buyer and seller RLS isolation": "buyer one rls isolation failed" in integration and "seller rls visibility failed" in integration,
     "QA tests private RLS helper grants": "anon can execute private rls helpers" in integration,
+    "QA tests empty search_path on both RLS helpers": "seller_empty_path" in integration and "buyer_empty_path" in integration and integration.count("proconfig[1] = 'search_path=\"\"'") >= 2,
     "existing order guard prerequisite": "create trigger trg_nexora_order_guard before insert on public.orders" in hardening,
     "existing stock guard prerequisite": "create trigger trg_nexora_order_item_guard before insert on public.order_items" in hardening,
     "existing order total trigger prerequisite": "create trigger trg_nexora_recalculate_order_total after insert or update or delete on public.order_items" in hardening,
