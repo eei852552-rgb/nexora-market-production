@@ -157,9 +157,17 @@ function openCheckout() {
       }
       const replayWithNewCart = result.idempotent_replay === true && state.cart.length > 0;
       try { sessionStorage.removeItem(requestStorageKey); } catch {}
-      if (replayWithNewCart) {
-        $('#drawer').innerHTML = `<div class="modal-bg"><div class="modal order-success"><strong>✓</strong><h2>Previous order already confirmed</h2><p class="small">Order #${esc(String(result.order_id).slice(0,8))} was already created. Your current cart still has items and was not submitted as a new order.</p><button class="primary" id="reviewCurrentCart">Review current cart</button><button class="secondary" id="seeOrder">View my orders</button></div></div>`;
-        $('#reviewCurrentCart').onclick = () => { $('#drawer').innerHTML = ''; openCart(); };
+      if (result.idempotent_replay === true) {
+        const replayMessage = replayWithNewCart
+          ? 'This order was already accepted. Your current cart still has items and was not submitted as a new order.'
+          : 'This order was already accepted. No duplicate order was created.';
+        const reviewButton = replayWithNewCart
+          ? '<button class="primary" id="reviewCurrentCart">Review current cart</button>'
+          : '';
+        $('#drawer').innerHTML = `<div class="modal-bg"><div class="modal order-success"><strong>✓</strong><h2>Previous order already confirmed</h2><p class="small">Order #${esc(String(result.order_id).slice(0,8))}. ${replayMessage}</p>${reviewButton}<button class="secondary" id="seeOrder">View my orders</button></div></div>`;
+        if (replayWithNewCart) {
+          $('#reviewCurrentCart').onclick = () => { $('#drawer').innerHTML = ''; openCart(); };
+        }
         $('#seeOrder').onclick = () => { $('#drawer').innerHTML = ''; state.view = 'orders'; render(); };
         return;
       }
