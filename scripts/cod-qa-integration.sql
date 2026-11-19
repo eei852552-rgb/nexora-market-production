@@ -85,12 +85,65 @@ begin
   if v_wrapper_definer is distinct from false then raise exception 'public wrapper must be SECURITY INVOKER'; end if;
 end $$;
 
--- Direct authenticated order/order-item INSERT must be revoked.
-do $rls$
+-- Verify least-privilege grants. RLS does not protect TRUNCATE.
+do $acl$
 begin
-  if has_table_privilege('authenticated','public.orders','INSERT') then raise exception 'authenticated can directly insert orders'; end if;
-  if has_table_privilege('authenticated','public.order_items','INSERT') then raise exception 'authenticated can directly insert order_items'; end if;
-end $rls$;
+  if not has_table_privilege('authenticated','public.orders','SELECT')
+     or not has_table_privilege('authenticated','public.order_items','SELECT') then
+    raise exception 'authenticated must retain order and order-item SELECT';
+  end if;
+  if has_table_privilege('anon','public.orders','SELECT')
+     or has_table_privilege('anon','public.order_items','SELECT')
+     or has_table_privilege('anon','public.carts','SELECT') then
+    raise exception 'anon must not read private COD tables';
+  end if;
+  if has_table_privilege('anon','public.orders','INSERT')
+     or has_table_privilege('anon','public.orders','UPDATE')
+     or has_table_privilege('anon','public.orders','DELETE')
+     or has_table_privilege('anon','public.orders','TRUNCATE')
+     or has_table_privilege('anon','public.order_items','INSERT')
+     or has_table_privilege('anon','public.order_items','UPDATE')
+     or has_table_privilege('anon','public.order_items','DELETE')
+     or has_table_privilege('anon','public.order_items','TRUNCATE')
+     or has_table_privilege('anon','public.carts','INSERT')
+     or has_table_privilege('anon','public.carts','UPDATE')
+     or has_table_privilege('anon','public.carts','DELETE')
+     or has_table_privilege('anon','public.carts','TRUNCATE') then
+    raise exception 'anon retains an unsafe COD table privilege';
+  end if;
+  if has_table_privilege('authenticated','public.orders','INSERT')
+     or has_table_privilege('authenticated','public.orders','UPDATE')
+     or has_table_privilege('authenticated','public.orders','DELETE')
+     or has_table_privilege('authenticated','public.orders','TRUNCATE')
+     or has_table_privilege('authenticated','public.orders','REFERENCES')
+     or has_table_privilege('authenticated','public.orders','TRIGGER')
+     or has_table_privilege('authenticated','public.order_items','INSERT')
+     or has_table_privilege('authenticated','public.order_items','UPDATE')
+     or has_table_privilege('authenticated','public.order_items','DELETE')
+     or has_table_privilege('authenticated','public.order_items','TRUNCATE')
+     or has_table_privilege('authenticated','public.order_items','REFERENCES')
+     or has_table_privilege('authenticated','public.order_items','TRIGGER') then
+    raise exception 'authenticated retains an unsafe direct order privilege';
+  end if;
+  if not has_table_privilege('authenticated','public.carts','SELECT')
+     or not has_table_privilege('authenticated','public.carts','INSERT')
+     or not has_table_privilege('authenticated','public.carts','UPDATE')
+     or not has_table_privilege('authenticated','public.carts','DELETE')
+     or has_table_privilege('authenticated','public.carts','TRUNCATE')
+     or has_table_privilege('authenticated','public.carts','REFERENCES')
+     or has_table_privilege('authenticated','public.carts','TRIGGER') then
+    raise exception 'authenticated cart grants are not least-privilege CRUD';
+  end if;
+  if not has_table_privilege('anon','public.products','SELECT')
+     or not has_table_privilege('authenticated','public.products','SELECT')
+     or not has_table_privilege('authenticated','public.products','INSERT')
+     or not has_table_privilege('authenticated','public.products','UPDATE')
+     or not has_table_privilege('authenticated','public.products','DELETE')
+     or has_table_privilege('anon','public.products','TRUNCATE')
+     or has_table_privilege('authenticated','public.products','TRUNCATE') then
+    raise exception 'product grants do not match the public-read/authenticated-CRUD model';
+  end if;
+end $acl$;
 
 -- Seed a second buyer order and carts as the fixture owner, then exercise
 -- the actual post-migration RLS policies under each authenticated identity.
