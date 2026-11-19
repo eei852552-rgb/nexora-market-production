@@ -36,6 +36,7 @@ Do not apply this migration to the production Supabase project or deploy this br
 
 ## Latest CI evidence
 
-- [GitHub Actions run 44591295591](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/44591295591) passed on commit `5af56bd924495e4079b02f2daffd4cefb78dbd44`.
-- The disposable PostgreSQL 16 run applied both COD migrations, passed the retry/privilege/RLS smoke checks, and passed two concurrent same-request checkout calls. Both calls returned the same order; stock was reduced once; a different cart row added while checkout waited remained in the cart.
+- [GitHub Actions run 44592086326](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/44592086326) passed on commit `d7b98700ba38eb11861213c0f9c18bc0589b4dde`.
+- The disposable PostgreSQL 16 run applied both COD migrations and passed retry/replay, least-privilege ACL, RLS isolation, invalid-input, missing-request-ID, insufficient-stock rollback, unavailable-product rollback, and buyer-scoped request-ID checks.
+- Two concurrent same-request checkout calls returned the same order; stock was reduced once; a different cart row added while checkout waited remained in the cart.
 - This does not verify Supabase Auth, PostgREST, a signed-in browser session, or production behavior.
