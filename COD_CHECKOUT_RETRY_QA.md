@@ -32,3 +32,10 @@ Do not apply this migration to the production Supabase project or deploy this br
 - The QA project currently has broad default table grants on its public tables, including `TRUNCATE` on COD-related tables. RLS does not block `TRUNCATE`. Do not use this project for browser/authenticated QA or create fixtures until an owner reviews and applies `scripts/qa-project-acl-hardening.sql`, then verifies the resulting grants.
 - The CI workflow uses a disposable PostgreSQL 16 service. Its tests are local/CI database tests, not proof of Supabase Auth/PostgREST behavior or production verification.
 - No QA account, seller role, product, cart, or order has been created in the Supabase QA project. Production data and the live deployment remain untouched.
+
+
+## Latest CI evidence
+
+- [GitHub Actions run 44591295591](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/44591295591) passed on commit `5af56bd924495e4079b02f2daffd4cefb78dbd44`.
+- The disposable PostgreSQL 16 run applied both COD migrations, passed the retry/privilege/RLS smoke checks, and passed two concurrent same-request checkout calls. Both calls returned the same order; stock was reduced once; a different cart row added while checkout waited remained in the cart.
+- This does not verify Supabase Auth, PostgREST, a signed-in browser session, or production behavior.
