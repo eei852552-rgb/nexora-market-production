@@ -8,7 +8,10 @@ Status: review-only. This document does not authorize a production migration or 
 - Candidate branch: `cod-idempotency-qa-20261119`
 - Migration: `supabase/migrations/202611190001_cod_checkout_idempotency.sql`
 - Supabase project: `nbhfdiiehukdtusxksni`
-- The migration has only been exercised against a disposable PostgreSQL 16 CI fixture.
+- The candidate migration is on an isolated Git branch. The separate Supabase project `nexora-market-qa` is active and its migration history contains `cod_checkout_idempotency`; a read-only audit confirms the request-ID index and four-argument RPC/private functions are present.
+- The disposable PostgreSQL 16 CI fixture is the only environment with repeatable checkout integration evidence so far. CI does not reproduce Supabase Auth, PostgREST, or every managed-role behavior.
+- A read-only audit found broad default grants on the QA project's public tables, including `TRUNCATE` on COD-related tables. `scripts/qa-project-acl-hardening.sql` is prepared but has not been applied. Do not use the QA project for browser/authenticated tests until its owner reviews/applies that script and verifies the grants.
+- No QA user or data fixtures have been created; no production migration or deployment has occurred.
 - Do not merge to `main`, apply to the live database, or deploy the frontend without explicit approval.
 
 ## Preflight — must all pass before any future production change
