@@ -3,11 +3,13 @@ import re
 import sys
 
 sql_path = Path("supabase/migrations/202611190001_cod_checkout_idempotency.sql")
+acl_path = Path("supabase/migrations/202611200001_cod_checkout_acl_hardening.sql")
 app_path = Path("app.js")
 hardening_path = Path("supabase/production-hardening.sql")
 fixture_path = Path("scripts/cod-qa-bootstrap.sql")
 integration_path = Path("scripts/cod-qa-integration.sql")
 sql = sql_path.read_text(encoding="utf-8").lower()
+acl_sql = acl_path.read_text(encoding="utf-8").lower()
 app = app_path.read_text(encoding="utf-8").lower()
 hardening = hardening_path.read_text(encoding="utf-8").lower()
 fixture = fixture_path.read_text(encoding="utf-8").lower()
@@ -20,7 +22,11 @@ checks = {
     "private function checks authenticated user": "if v_user is null" in sql,
     "request UUID required": "if p_request_id is null" in sql,
     "public wrapper is invoker": "security invoker" in sql,
-    "direct order inserts revoked": "revoke insert on public.orders, public.order_items from anon, authenticated" in sql,
+    "COD ACL migration exists": acl_path.exists(),
+    "all client privileges revoked on COD/catalog tables": "revoke all privileges on table" in acl_sql and "public.orders" in acl_sql and "public.order_items" in acl_sql and "public.carts" in acl_sql and "public.products" in acl_sql,
+    "authenticated order/item access is read-only": "grant select on table public.orders, public.order_items to authenticated" in acl_sql,
+    "cart is authenticated CRUD only": "grant select, insert, update, delete on table public.carts to authenticated" in acl_sql,
+    "catalog is public-read and authenticated CRUD": "grant select on table public.products to anon, authenticated" in acl_sql and "grant insert, update, delete on table public.products to authenticated" in acl_sql,
     "cart snapshot locks and captures rows atomically": "with locked_cart as materialized" in sql and "for update" in sql,
     "cart snapshot includes updated_at": "'updated_at', lc.updated_at" in sql,
     "cart deletion matches snapshot version": "and updated_at = v_item.updated_at" in sql,
