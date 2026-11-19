@@ -26,3 +26,13 @@ Supabase security advisors report one warning: `auth_leaked_password_protection`
 A confirmed user session is still unavailable for a real signed-in cart/order end-to-end test because Auth email signup is rate-limited. The source and RLS paths are implemented, but that test remains explicitly unverified. There are currently no published products, so live checkout cannot be exercised with a real listing.
 
 Online payments remain disabled and no paid service or domain was purchased.
+
+
+## COD idempotency QA status — 2026-11-20
+
+- Candidate work remains on `cod-idempotency-qa-20261119`; `main` and the live GitHub Pages deployment are unchanged.
+- The separate Supabase project `nexora-market-qa` is active. Read-only checks show the COD request-ID column/index, four-argument `public.create_cod_order` SECURITY INVOKER wrapper, and private SECURITY DEFINER implementation/RLS helpers are present. Its relevant data tables remain empty.
+- A read-only privilege audit found broad default grants on the QA project's public tables, including `TRUNCATE` on COD tables. `scripts/qa-project-acl-hardening.sql` is prepared but not applied. No authenticated/browser QA or fixtures should be created until the project owner approves and verifies ACL hardening.
+- CI previously passed static checks and a disposable PostgreSQL 16 integration smoke test. Additional least-privilege and concurrent retry/cart-snapshot tests have now been added to the branch; their new workflow result is pending verification.
+- The COD candidate migration has not been applied to production. No production data, live website, existing backups, or main-branch files were changed.
+- Separate production security finding: `public.reports` has RLS enabled but broad `anon` and `authenticated` table privileges including `TRUNCATE`; the table currently has zero rows. This is outside the COD migration and was not changed. It needs a separately reviewed security fix before treating the database as launch-ready.
