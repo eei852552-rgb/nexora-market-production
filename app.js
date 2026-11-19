@@ -116,10 +116,18 @@ function openCheckout() {
     return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
   };
   let requestId = '';
-  try { requestId = sessionStorage.getItem(requestStorageKey) || ''; } catch {}
-  if (!requestId) {
-    requestId = makeRequestId();
-    try { sessionStorage.setItem(requestStorageKey, requestId); } catch {}
+  try {
+    requestId = sessionStorage.getItem(requestStorageKey) || '';
+    if (!requestId) {
+      requestId = makeRequestId();
+      sessionStorage.setItem(requestStorageKey, requestId);
+      if (sessionStorage.getItem(requestStorageKey) !== requestId) {
+        throw new Error('checkout retry key could not be persisted');
+      }
+    }
+  } catch {
+    toast('Secure retry protection is unavailable in this browser tab. Enable site storage and try again.', 'error');
+    return;
   }
   $('#drawer').innerHTML = `<aside class="drawer"><div class="drawer-head"><div><span class="eyebrow">LIVE COD CHECKOUT</span><h2 style="margin-top:7px">Delivery details</h2></div><button class="close" id="closeCheckout">×</button></div><div class="notice">This order is submitted to Supabase only after validation. A retry of the same cart uses the same request ID to prevent duplicate orders. If the database fails, no success message is shown and your cart is kept.</div><div class="field"><label>FULL NAME</label><input id="name" minlength="2" placeholder="Your name / အမည်"></div><div class="field"><label>PHONE</label><input id="phone" minlength="6" placeholder="09 xxx xxx xxx"></div><div class="field"><label>DELIVERY ADDRESS</label><textarea id="address" minlength="8" placeholder="Township, street, house number"></textarea></div><div class="panel" style="margin:16px 0"><span class="eyebrow">PAYMENT METHOD</span><p style="font-size:12px;margin:10px 0">◉ Cash on delivery <span class="pill green">AVAILABLE</span></p><small style="color:var(--muted)">Online payments remain disabled. No card data is collected.</small></div><div class="cart-total"><span>Live total</span><span>${money(total)}</span></div><p id="checkoutError" class="form-error"></p><button class="primary" style="width:100%" id="placeOrder">Place COD order</button></aside>`;
   $('#closeCheckout').onclick = () => $('#drawer').innerHTML = '';
