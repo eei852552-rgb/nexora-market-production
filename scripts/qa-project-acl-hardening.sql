@@ -1,6 +1,6 @@
 -- QA PROJECT ONLY. Never apply this script to production.
 -- Target: the separate Supabase project named nexora-market-qa.
--- This changes table privileges/default privileges only; it does not modify rows,
+-- This changes current table privileges only; it does not modify rows,
 -- RLS policies, functions, triggers, or production resources.
 -- Review the project ref and table list before running as the QA database owner.
 
