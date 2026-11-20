@@ -30,12 +30,9 @@ grant select, insert, update on table public.profiles to authenticated;
 grant select, insert, update, delete on table public.seller_applications to authenticated;
 grant select, insert, update, delete on table public.wishlists to authenticated;
 
--- Prevent future tables created by either observed owner role from inheriting
--- broad anon/authenticated defaults in the public schema.
-alter default privileges for role postgres in schema public
-  revoke all on tables from public, anon, authenticated;
-alter default privileges for role supabase_admin in schema public
-  revoke all on tables from public, anon, authenticated;
+-- Default privileges are intentionally unchanged here. The connected hosted
+-- SQL role cannot alter defaults owned by supabase_admin. Current tables are
+-- hardened below; future tables require a separate owner-level default-ACL change.
 
 do $acl$
 declare
