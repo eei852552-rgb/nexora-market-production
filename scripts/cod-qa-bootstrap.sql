@@ -11,7 +11,12 @@ create schema private;
 create or replace function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
 $$;
-create or replace function private.is_admin() returns boolean language sql stable as $$ select false $$;
+create or replace function private.is_admin()
+returns boolean language sql stable
+as $ select coalesce(current_setting('nexora.test_admin', true), 'off') = 'on' $;
+create or replace function private.is_approved_seller()
+returns boolean language sql stable
+as $ select false $;
 
 create table auth.users (id uuid primary key);
 create table public.profiles (
@@ -26,6 +31,28 @@ create table public.products (
   updated_at timestamptz not null default now(), type text not null default 'Physical',
   stock integer, is_featured boolean not null default false, icon text not null default '📦'
 );
+-- Model the QA project's original moderation guard. The alignment migration
+-- must remove this extra check so buyer checkout can decrement seller stock.
+create or replace function public.nexora_product_guard()
+returns trigger language plpgsql security definer set search_path=''
+as $function$
+begin
+  if not private.is_admin() then
+    if tg_op='INSERT' then
+      if new.seller_id is distinct from auth.uid() then raise exception 'seller_id must match authenticated user'; end if;
+      new.status := 'draft';
+    elsif tg_op='UPDATE' then
+      if new.seller_id is distinct from old.seller_id then raise exception 'seller_id cannot change'; end if;
+      if new.status is distinct from old.status then new.status := old.status; end if;
+    end if;
+    if not private.is_approved_seller() then raise exception 'approved seller required'; end if;
+  end if;
+  return new;
+end;
+$function$;
+create trigger trg_nexora_product_guard before insert or update on public.products
+for each row execute function public.nexora_product_guard();
+
 create table public.carts (
   user_id uuid not null references auth.users(id), product_id uuid not null references public.products(id),
   quantity integer not null default 1 check(quantity>0), updated_at timestamptz not null default now(),

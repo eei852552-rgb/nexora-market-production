@@ -61,6 +61,7 @@ jobs:
         run: |
           psql -h localhost -U postgres -d nexora_qa -v ON_ERROR_STOP=1 -f supabase/migrations/202611190001_cod_checkout_idempotency.sql
           psql -h localhost -U postgres -d nexora_qa -v ON_ERROR_STOP=1 -f supabase/migrations/202611200001_cod_checkout_acl_hardening.sql
+          psql -h localhost -U postgres -d nexora_qa -v ON_ERROR_STOP=1 -f supabase/migrations/202611210001_product_stock_guard_alignment.sql
       - name: Run COD retry and privilege integration checks
         env:
           PGPASSWORD: qa-only-password

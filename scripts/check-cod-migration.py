@@ -4,12 +4,16 @@ import sys
 
 sql_path = Path("supabase/migrations/202611190001_cod_checkout_idempotency.sql")
 acl_path = Path("supabase/migrations/202611200001_cod_checkout_acl_hardening.sql")
+product_guard_path = Path("supabase/migrations/202611210001_product_stock_guard_alignment.sql")
+workflow_path = Path(".github/workflows/cod-qa-check.yml")
 app_path = Path("app.js")
 hardening_path = Path("supabase/production-hardening.sql")
 fixture_path = Path("scripts/cod-qa-bootstrap.sql")
 integration_path = Path("scripts/cod-qa-integration.sql")
 sql = sql_path.read_text(encoding="utf-8").lower()
 acl_sql = acl_path.read_text(encoding="utf-8").lower()
+product_guard_sql = product_guard_path.read_text(encoding="utf-8").lower()
+workflow = workflow_path.read_text(encoding="utf-8").lower()
 app = app_path.read_text(encoding="utf-8").lower()
 hardening = hardening_path.read_text(encoding="utf-8").lower()
 fixture = fixture_path.read_text(encoding="utf-8").lower()
@@ -18,6 +22,13 @@ qa_acl_path = Path("scripts/qa-project-acl-hardening.sql")
 qa_acl = qa_acl_path.read_text(encoding="utf-8").lower()
 
 checks = {
+    "product stock-guard alignment migration exists": product_guard_path.exists(),
+    "product guard uses SECURITY DEFINER with empty search_path": "security definer" in product_guard_sql and "set search_path = ''" in product_guard_sql,
+    "product guard preserves seller identity and status controls": "new.seller_id is distinct from old.seller_id" in product_guard_sql and "new.status is distinct from old.status" in product_guard_sql and "private.is_admin()" in product_guard_sql,
+    "product guard does not require the buyer to be an approved seller": "private.is_approved_seller" not in product_guard_sql and "approved seller required" not in product_guard_sql,
+    "CI fixture reproduces the QA-only approval guard before migration": "approved seller required" in fixture and "create trigger trg_nexora_product_guard" in fixture,
+    "CI seeds products only while the fixture admin flag is enabled": integration.count("set_config('nexora.test_admin','on',false)") >= 2 and integration.count("set_config('nexora.test_admin','off',false)") >= 2,
+    "CI applies product stock-guard alignment migration": "202611210001_product_stock_guard_alignment.sql" in workflow,
     "QA ACL script is explicitly limited to the separate QA project": "-- qa project only" in qa_acl and "nexora-market-qa" in qa_acl,
     "QA ACL script hardens postgres-owned default table grants only": "alter default privileges for role postgres" in qa_acl and "alter default privileges for role supabase_admin" not in qa_acl,
     "QA ACL script revokes broad table privileges": "revoke all privileges on table" in qa_acl and "from public, anon, authenticated" in qa_acl,

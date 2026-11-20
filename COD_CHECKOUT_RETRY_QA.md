@@ -29,10 +29,16 @@ Do not apply this migration to the production Supabase project or deploy this br
 
 - The feature branch's `config.js` points to the separate Supabase project `nexora-market-qa`; it is not the production project.
 - A read-only Supabase audit confirmed the QA project is active, has the COD request-ID column and unique index, and has the four-argument public RPC plus private implementation/RLS helpers. Its current orders, order items, carts, products, and profiles tables contain zero rows.
-- The QA project currently has broad default table grants on its public tables, including `TRUNCATE` on COD-related tables. RLS does not block `TRUNCATE`. Do not use this project for browser/authenticated QA or create fixtures until an owner reviews and applies `scripts/qa-project-acl-hardening.sql`, then verifies the resulting grants.
+- The nine current QA public tables have been hardened by `scripts/qa-project-acl-hardening.sql`: anon/authenticated have no `TRUNCATE`, `REFERENCES`, or `TRIGGER` privileges; COD orders/items are SELECT-only for authenticated users; carts retain CRUD; and catalog reads remain available. The `postgres` owner's future-table defaults are also revoked for anon/authenticated. The `supabase_admin` default ACL remains broad because the connected SQL role cannot alter defaults owned by that role; owner-level review is still required before creating new public tables under `supabase_admin`.
 - The CI workflow uses a disposable PostgreSQL 16 service. Its tests are local/CI database tests, not proof of Supabase Auth/PostgREST behavior or production verification.
-- No QA account, seller role, product, cart, or order has been created in the Supabase QA project. Production data and the live deployment remain untouched.
+- No new persistent QA accounts, seller roles, products, carts, or orders were created. Two pre-existing Auth user records were preserved. Transaction-scoped test fixtures were rolled back and left no rows behind. Production data and the live deployment remain untouched.
 
+
+## QA product stock-guard alignment
+
+- Read-only inspection found that the QA project's `nexora_product_guard()` had an extra `private.is_approved_seller()` check on every product update. The order-item SECURITY DEFINER trigger decrements stock while the JWT subject is the buyer, so this QA-only check blocked otherwise valid COD checkout.
+- Migration `202611210001_product_stock_guard_alignment.sql` aligns the guard with the production hardening definition. Seller approval remains enforced by the product INSERT/UPDATE RLS policies; the trigger no longer rejects the internal stock decrement because the buyer is not a seller.
+- The disposable PostgreSQL fixture now starts with the QA-only guard and applies this migration before tests. The normal COD stock-decrement assertion therefore fails if the alignment migration is missing.
 
 ## Latest CI evidence
 

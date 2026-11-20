@@ -8,8 +8,10 @@ insert into public.profiles(id,display_name) values
  ('11111111-1111-4111-8111-111111111111','QA Buyer'),
  ('22222222-2222-4222-8222-222222222222','Other Buyer'),
  ('33333333-3333-4333-8333-333333333333','QA Seller');
+select set_config('nexora.test_admin','on',false);
 insert into public.products(id,seller_id,name,price,stock,status)
 values ('44444444-4444-4444-8444-444444444444','33333333-3333-4333-8333-333333333333','QA item',1250,10,'published');
+select set_config('nexora.test_admin','off',false);
 insert into public.carts(user_id,product_id,quantity)
 values ('11111111-1111-4111-8111-111111111111','44444444-4444-4444-8444-444444444444',2);
 
@@ -53,10 +55,12 @@ begin
 end $$;
 
 -- Failure paths must roll back completely and preserve the cart and stock.
+select set_config('nexora.test_admin','on',false);
 insert into public.products(id,seller_id,name,description,price,currency,category,status,stock)
 values
  ('66666666-6666-4666-8666-666666666666','33333333-3333-4333-8333-333333333333','Low stock QA item','CI fixture',500,'MMK','Other','published',1),
  ('77777777-7777-4777-8777-777777777777','33333333-3333-4333-8333-333333333333','Draft QA item','CI fixture',750,'MMK','Other','draft',5);
+select set_config('nexora.test_admin','off',false);
 insert into public.carts(user_id,product_id,quantity) values
  ('11111111-1111-4111-8111-111111111111','66666666-6666-4666-8666-666666666666',2),
  ('11111111-1111-4111-8111-111111111111','77777777-7777-4777-8777-777777777777',1);
