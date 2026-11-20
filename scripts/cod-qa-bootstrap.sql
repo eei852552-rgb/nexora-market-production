@@ -13,10 +13,10 @@ create or replace function auth.uid() returns uuid language sql stable as $$
 $$;
 create or replace function private.is_admin()
 returns boolean language sql stable
-as $ select coalesce(current_setting('nexora.test_admin', true), 'off') = 'on' $;
+as $fn$ select coalesce(current_setting('nexora.test_admin', true), 'off') = 'on' $fn$;
 create or replace function private.is_approved_seller()
 returns boolean language sql stable
-as $ select false $;
+as $fn$ select false $fn$;
 
 create table auth.users (id uuid primary key);
 create table public.profiles (
