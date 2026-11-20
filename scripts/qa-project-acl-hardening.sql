@@ -55,7 +55,7 @@ begin
 
   if not has_table_privilege('authenticated','public.orders','SELECT')
      or not has_table_privilege('authenticated','public.order_items','SELECT')
-     or has_table_privilege('authenticated','public.carts','INSERT')
+     or not has_table_privilege('authenticated','public.carts','INSERT')
      or not has_table_privilege('anon','public.products','SELECT')
      or not has_table_privilege('anon','public.advertisements','SELECT') then
     raise exception 'required application grants are missing';
