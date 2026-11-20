@@ -19,7 +19,7 @@ qa_acl = qa_acl_path.read_text(encoding="utf-8").lower()
 
 checks = {
     "QA ACL script is explicitly limited to the separate QA project": "-- qa project only" in qa_acl and "nexora-market-qa" in qa_acl,
-    "QA ACL script does not attempt inaccessible default-ACL changes": "alter default privileges" not in qa_acl,
+    "QA ACL script hardens postgres-owned default table grants only": "alter default privileges for role postgres" in qa_acl and "alter default privileges for role supabase_admin" not in qa_acl,
     "QA ACL script revokes broad table privileges": "revoke all privileges on table" in qa_acl and "from public, anon, authenticated" in qa_acl,
     "QA ACL script grants cart CRUD to authenticated users": "grant select, insert, update, delete on table public.carts to authenticated" in qa_acl,
     "QA ACL script grants read-only access to COD orders and items": "grant select on table public.order_items, public.orders to authenticated" in qa_acl,
