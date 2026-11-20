@@ -1,6 +1,6 @@
 -- QA PROJECT ONLY. Never apply this script to production.
 -- Target: the separate Supabase project named nexora-market-qa.
--- This changes current table privileges only; it does not modify rows,
+-- This changes current table privileges and postgres-owned public-schema table defaults; it does not modify rows,
 -- RLS policies, functions, triggers, or production resources.
 -- Review the project ref and table list before running as the QA database owner.
 
@@ -30,9 +30,11 @@ grant select, insert, update on table public.profiles to authenticated;
 grant select, insert, update, delete on table public.seller_applications to authenticated;
 grant select, insert, update, delete on table public.wishlists to authenticated;
 
--- Default privileges are intentionally unchanged here. The connected hosted
--- SQL role cannot alter defaults owned by supabase_admin. Current tables are
--- hardened below; future tables require a separate owner-level default-ACL change.
+-- Harden future public tables created by postgres. The connected hosted
+-- SQL role cannot alter defaults owned by supabase_admin; those remain a
+-- separate owner-level task.
+alter default privileges for role postgres in schema public
+  revoke all on tables from public, anon, authenticated;
 
 do $acl$
 declare
