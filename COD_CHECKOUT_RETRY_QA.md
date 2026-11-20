@@ -38,11 +38,13 @@ Do not apply this migration to the production Supabase project or deploy this br
 
 - Read-only inspection found that the QA project's `nexora_product_guard()` had an extra `private.is_approved_seller()` check on every product update. The order-item SECURITY DEFINER trigger decrements stock while the JWT subject is the buyer, so this QA-only check blocked otherwise valid COD checkout.
 - Migration `202611210001_product_stock_guard_alignment.sql` aligns the guard with the production hardening definition. Seller approval remains enforced by the product INSERT/UPDATE RLS policies; the trigger no longer rejects the internal stock decrement because the buyer is not a seller.
+- Applied to `nexora-market-qa` as migration `product_stock_guard_alignment` (version `20261120183734`); the `products_guard` trigger remains attached and now uses the aligned function.
 - The disposable PostgreSQL fixture now starts with the QA-only guard and applies this migration before tests. The normal COD stock-decrement assertion therefore fails if the alignment migration is missing.
 
 ## Latest CI evidence
 
-- [GitHub Actions run 44592086326](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/44592086326) passed on commit `d7b98700ba38eb11861213c0f9c18bc0589b4dde`.
-- The disposable PostgreSQL 16 run applied both COD migrations and passed retry/replay, least-privilege ACL, RLS isolation, invalid-input, missing-request-ID, insufficient-stock rollback, unavailable-product rollback, and buyer-scoped request-ID checks.
-- Two concurrent same-request checkout calls returned the same order; stock was reduced once; a different cart row added while checkout waited remained in the cart.
-- This does not verify Supabase Auth, PostgREST, a signed-in browser session, or production behavior.
+- [Latest GitHub Actions run 44795028983](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/44795028983) passed on commit `501ae6996cc7e7f00d1eda2b321de7e369c2a7fb`; both static checks and PostgreSQL integration/concurrency jobs passed.
+- The disposable PostgreSQL 16 run applies the COD idempotency migration, COD ACL migration, and product stock-guard alignment migration. It passes retry/replay, least-privilege ACL, RLS isolation, invalid-input, missing-request-ID, insufficient-stock rollback, unavailable-product rollback, buyer-scoped request-ID, concurrent same-request, and concurrent cart-snapshot checks.
+- A separate transaction-scoped test against the actual Supabase QA PostgreSQL 17.12 project passed: first COD order and replay returned one order ID; total was 2,500 MMK; stock moved from 10 to 8 once; the original cart row was consumed; another buyer saw zero order/items while the seller saw one; direct INSERTs into orders/items were denied; insufficient stock, invalid delivery, and missing request ID failed without partial order/stock/cart effects.
+- That QA test used temporary Auth user/product fixtures inside one transaction and rolled back. The pre-existing Auth user count remained 2 and all nine public tables remained empty afterward.
+- The QA SQL test uses simulated JWT claim settings and database role switching. It verifies the QA database functions, triggers, grants, and RLS, but does not verify the Supabase Auth HTTP API, PostgREST HTTP behavior, or a signed-in browser session. It is not production verification.
