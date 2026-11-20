@@ -56,11 +56,13 @@ def main():
     # Buyer one has one cart row for PRODUCT_A; PRODUCT_B is a new concurrent cart addition.
     psql(
         f"""
+        select set_config('nexora.test_admin','on',false);
         insert into public.products
           (id, seller_id, name, description, price, currency, category, status, stock)
         values
           ('{PRODUCT_B}', '33333333-3333-4333-8333-333333333333',
            'Concurrent cart addition', 'CI-only fixture', 900, 'MMK', 'Other', 'published', 5);
+        select set_config('nexora.test_admin','off',false);
         """,
         app="cod-qa-seed",
     )
