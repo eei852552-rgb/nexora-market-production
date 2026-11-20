@@ -14,8 +14,17 @@ app = app_path.read_text(encoding="utf-8").lower()
 hardening = hardening_path.read_text(encoding="utf-8").lower()
 fixture = fixture_path.read_text(encoding="utf-8").lower()
 integration = integration_path.read_text(encoding="utf-8").lower()
+qa_acl_path = Path("scripts/qa-project-acl-hardening.sql")
+qa_acl = qa_acl_path.read_text(encoding="utf-8").lower()
 
 checks = {
+    "QA ACL script is explicitly limited to the separate QA project": "-- qa project only" in qa_acl and "nexora-market-qa" in qa_acl,
+    "QA ACL script does not attempt inaccessible default-ACL changes": "alter default privileges" not in qa_acl,
+    "QA ACL script revokes broad table privileges": "revoke all privileges on table" in qa_acl and "from public, anon, authenticated" in qa_acl,
+    "QA ACL script grants cart CRUD to authenticated users": "grant select, insert, update, delete on table public.carts to authenticated" in qa_acl,
+    "QA ACL script grants read-only access to COD orders and items": "grant select on table public.order_items, public.orders to authenticated" in qa_acl,
+    "QA ACL script requires cart INSERT privilege": "or not has_table_privilege('authenticated','public.carts','insert')" in qa_acl,
+    "QA ACL script blocks elevated table privileges": all(f"has_table_privilege('{role}', t, '{priv}')" in qa_acl for role in ("anon", "authenticated") for priv in ("truncate", "references", "trigger")),
     "request UUID stored on orders": bool(re.search(r"add column if not exists request_id uuid", sql)),
     "buyer/request unique index": "on public.orders (buyer_id, request_id)" in sql,
     "private implementation": "function private.create_cod_order_impl(" in sql,
