@@ -28,11 +28,24 @@ A confirmed user session is still unavailable for a real signed-in cart/order en
 Online payments remain disabled and no paid service or domain was purchased.
 
 
-## COD idempotency QA status — 2026-11-20
+## COD idempotency QA status — re-audited 2026-11-22
 
-- Candidate work remains on `cod-idempotency-qa-20261119`; `main` and the live GitHub Pages deployment are unchanged.
-- The separate Supabase project `nexora-market-qa` is active. Read-only checks show the COD request-ID column/index, four-argument `public.create_cod_order` SECURITY INVOKER wrapper, and private SECURITY DEFINER implementation/RLS helpers are present. Its relevant data tables remain empty.
-- A read-only privilege audit found broad default grants on the QA project's public tables, including `TRUNCATE` on COD tables. `scripts/qa-project-acl-hardening.sql` is prepared but not applied. No authenticated/browser QA or fixtures should be created until the project owner approves and verifies ACL hardening.
-- GitHub Actions run [44592086326](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/44592086326) passed on candidate commit `d7b9870`. It passed JavaScript syntax checks, static COD checks, disposable PostgreSQL 16 migration/integration tests, least-privilege ACL assertions, invalid-input/stock/unavailable-product rollback checks, buyer-scoped request-ID checks, and a two-session same-request concurrency test. The concurrency test confirmed one order, one stock decrement, and preservation of a cart row added while checkout was waiting. This is CI evidence only, not Supabase Auth/PostgREST or production verification.
-- The COD candidate migration has not been applied to production. No production data, live website, existing backups, or main-branch files were changed.
-- Separate production security finding: `public.reports` has RLS enabled but broad `anon` and `authenticated` table privileges including `TRUNCATE`; the table currently has zero rows. This is outside the COD migration and was not changed. It needs a separately reviewed security fix before treating the database as launch-ready.
+- Candidate work remains isolated on `cod-idempotency-qa-20261119` at commit `3910fae39b3e3d7d2c2cb8d93a0ee7e5b8809e15`. The branch is 81 commits ahead of `main` (`2da8087db864d58cd9dc3de17e1dc0f6d49b3ca0`) and 0 behind. No merge, main-branch update, or production deployment was performed.
+- GitHub Actions run [44795228889](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/44795228889) passed on the exact branch tip. Both `static-checks` and `postgres-integration` jobs passed, including JavaScript syntax, migration invariants, disposable PostgreSQL 16 integration checks, and two-session concurrency/cart-snapshot checks. This is CI evidence, not production verification.
+- The separate Supabase project `nexora-market-qa` (`gudvguwhqhuvpblwdcil`) is active on PostgreSQL 17.12. Its migration history includes the COD idempotency migration and product stock-guard alignment. The production project remains `nexora-market` (`nbhfdiiehukdtusxksni`).
+- A fresh read-only audit verified RLS is enabled on all nine QA public tables. Anon/authenticated have no `TRUNCATE`, `REFERENCES`, or `TRIGGER` privileges on those tables. COD `orders` and `order_items` are SELECT-only for authenticated users; carts retain authenticated CRUD; public catalog reads remain available. This confirms the current table-level QA ACL hardening is in effect.
+- Important remaining QA ACL issue: the `supabase_admin` default ACL for future public tables still grants broad privileges to anon/authenticated. The connected SQL role cannot alter defaults owned by `supabase_admin`; this requires owner-level review before creating additional public tables. The `postgres` default ACL is hardened.
+- QA data is clean: `auth.users=2` and `profiles=2` are pre-existing records; `admin_roles`, `advertisements`, `carts`, `order_items`, `orders`, `products`, `seller_applications`, and `wishlists` each contain zero rows. No new persistent QA user, seller role, product, cart, or order was created in this run.
+- A read-only SQL role simulation passed: anon can read the public product table but cannot read orders or insert orders/items; authenticated with a simulated JWT subject can read its own profile, select orders/items, execute the four-argument COD RPC, and use the private schema, while direct order/item INSERT remains denied. This tests PostgreSQL grants/RLS with simulated claims; it is not a real Supabase Auth session or HTTP request.
+- The available QA PostgREST log window contained 14 requests, all to `/`; there were zero `create_cod_order` mentions and zero direct `/rest/v1/orders` paths. Therefore no actual PostgREST COD request or signed-in browser checkout has been verified.
+- Supabase QA Security Advisor still reports `auth_leaked_password_protection` disabled. Performance Advisor reports 7 unindexed foreign keys and 6 multiple-permissive-policy findings. These were reviewed and not changed in this run.
+- A fresh production read-only audit confirms `orders.request_id` is absent and only the legacy three-argument `public.create_cod_order(text,text,text)` exists. Authenticated users still have direct INSERT grants on production `orders` and `order_items`. Production `public.reports` has RLS enabled but anon/authenticated retain broad table privileges including INSERT, DELETE, TRUNCATE, REFERENCES, and TRIGGER; it currently has zero rows. These are separate production security blockers and were not modified.
+- Production database, live GitHub Pages site, `main`, existing backups, and unrelated repositories were not changed. No backup/restore operation was run.
+
+## Next safe gates
+
+1. Obtain an owner-approved QA sign-in/session path and verify the four-argument COD RPC through actual Supabase Auth + PostgREST; do not create repeated accounts or bypass Auth rate limits.
+2. Resolve the `supabase_admin` future-table default ACL with an owner-authorized procedure.
+3. Review the unrelated production `reports` grants separately.
+4. Re-review the complete candidate migration against the current production schema and a verified recoverable backup before any production change.
+5. Keep the COD candidate off `main` and do not deploy or migrate production without explicit approval.
