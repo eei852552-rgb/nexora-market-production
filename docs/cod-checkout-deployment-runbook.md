@@ -9,10 +9,21 @@ Status: review-only. This document does not authorize a production migration or 
 - Migration: `supabase/migrations/202611190001_cod_checkout_idempotency.sql`
 - Supabase project: `nbhfdiiehukdtusxksni`
 - The candidate migration is on an isolated Git branch. The separate Supabase project `nexora-market-qa` is active and its migration history contains `cod_checkout_idempotency`; a read-only audit confirms the request-ID index and four-argument RPC/private functions are present.
-- The disposable PostgreSQL 16 CI fixture is the only environment with repeatable checkout integration evidence so far. CI does not reproduce Supabase Auth, PostgREST, or every managed-role behavior.
-- A read-only audit found broad default grants on the QA project's public tables, including `TRUNCATE` on COD-related tables. `scripts/qa-project-acl-hardening.sql` is prepared but has not been applied. Do not use the QA project for browser/authenticated tests until its owner reviews/applies that script and verifies the grants.
-- No QA user or data fixtures have been created; no production migration or deployment has occurred.
+- Disposable PostgreSQL 16 CI and transaction-scoped SQL tests on the separate Supabase QA PostgreSQL 17.12 project provide database-level checkout evidence. Neither reproduces a real Supabase Auth session, PostgREST HTTP call, or signed-in browser checkout.
+- A current read-only audit verifies table-level QA ACL hardening across all nine public tables: RLS is enabled and anon/authenticated have no `TRUNCATE`, `REFERENCES`, or `TRIGGER` privileges. COD orders/items are SELECT-only for authenticated users; carts retain CRUD. The `supabase_admin` default ACL for future public tables remains broad and requires owner-level review before new public tables are created.
+- Two pre-existing Auth users and two profile rows remain. No new persistent QA account, admin role, product, cart, or order was created; transaction-scoped fixtures from the prior QA test were rolled back. No production migration or deployment has occurred.
 - Do not merge to `main`, apply to the live database, or deploy the frontend without explicit approval.
+
+## Current QA verification snapshot — 2026-11-22
+
+- QA project `nexora-market-qa` is active on PostgreSQL 17.12. The COD request-ID column/index, four-argument invoker RPC, and private implementation/RLS helpers are present.
+- Current QA row counts: `auth.users=2`, `profiles=2`; the other eight public tables (`admin_roles`, `advertisements`, `carts`, `order_items`, `orders`, `products`, `seller_applications`, `wishlists`) are empty.
+- Read-only role simulation passed for the current grants: anon can select catalog products but cannot select orders or insert orders/items; authenticated with a simulated JWT subject can read its own profile and select orders/items, but cannot directly insert orders/items. The four-argument COD RPC is executable by authenticated only.
+- The available PostgREST log window had 14 events, all on `/`; no COD RPC or direct orders REST path was observed. Actual Auth/PostgREST and signed-in browser checkout remain unverified.
+- QA Security Advisor: leaked-password protection disabled. Performance Advisor: 7 unindexed foreign keys and 6 multiple-permissive-policy findings.
+- Production re-audit still shows no `orders.request_id`, only the legacy three-argument COD RPC, authenticated direct INSERT grants on orders/items, and broad anon/authenticated privileges on `public.reports` despite RLS being enabled. None of these production findings was changed.
+- GitHub Actions run [44795228889](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/44795228889) passed on candidate commit `3910fae39b3e3d7d2c2cb8d93a0ee7e5b8809e15`. CI used disposable PostgreSQL 16 and is not production verification.
+- The candidate remains on its feature branch; `main`, live deployment, production database, and existing backups remain unchanged.
 
 ## Preflight — must all pass before any future production change
 
