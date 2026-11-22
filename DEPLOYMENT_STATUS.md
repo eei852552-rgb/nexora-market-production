@@ -49,3 +49,17 @@ Online payments remain disabled and no paid service or domain was purchased.
 3. Review the unrelated production `reports` grants separately.
 4. Re-review the complete candidate migration against the current production schema and a verified recoverable backup before any production change.
 5. Keep the COD candidate off `main` and do not deploy or migrate production without explicit approval.
+
+
+## COD idempotency transaction re-test — 2026-11-23
+
+- Re-ran a disposable, transaction-scoped checkout test directly against the separate Supabase QA project `nexora-market-qa` (PostgreSQL 17.12). The entire test, including temporary fixture creation, was enclosed in one transaction and explicitly rolled back.
+- The first authenticated-role RPC call created one COD order with a database-calculated total of 2,500 MMK. Repeating the same buyer/request UUID returned the exact same order ID with `idempotent_replay=true`; stock was decremented once only.
+- Added a new cart item after the first order, then replayed the original request. The replay returned the original order and did not consume the new cart row.
+- Tested an atomic failure after an earlier valid cart line: a later low-stock line raised `insufficient stock`; the earlier line's order-item insert, stock decrement, and cart deletion were all rolled back. The two cart rows remained and the other product stocks remained unchanged.
+- RLS visibility assertions passed in the same QA transaction: the buyer saw one order/item, an unrelated temporary buyer saw zero, and the seller associated with the item saw one. All assertions passed.
+- Post-rollback read-only audit confirmed `auth.users=2`, `profiles=2`, `admin_roles=0`, and zero rows in products, carts, orders, order_items, and the other marketplace tables. The temporary third Auth user, temporary admin role, products, cart rows, order, and order item did not persist.
+- This was a real Supabase QA PostgreSQL transaction using `SET ROLE authenticated` and simulated JWT subject claims. It is stronger than a local fixture but is **not** a real Supabase Auth HTTP session, PostgREST HTTP RPC, or signed-in browser checkout. Those remain unverified.
+- Current feature branch tip is `bfff245aa286fe9ecde71f09cc30f49a4cf5c3cd`. The four commits after tested implementation baseline `3910fae39b3e3d7d2c2cb8d93a0ee7e5b8809e15` changed only `COD_CHECKOUT_RETRY_QA.md`, `DEPLOYMENT_STATUS.md`, and `docs/cod-checkout-deployment-runbook.md`; no application or migration code changed. The latest passing CI run remains [44936615100](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/44936615100) on code-equivalent commit `9f6cc650e8c000b2dc1cb0644cd8a90778c684d5`.
+- A fresh production read-only audit still finds no `orders.request_id`, only the legacy three-argument COD RPC, direct authenticated INSERT grants on orders/items, and broad anon/authenticated grants on `public.reports` (including TRUNCATE, REFERENCES, and TRIGGER). No production object or data was changed.
+- No merge, live deployment, backup/restore, or production migration was performed. Existing backups and all prior feature-branch changes were preserved.
