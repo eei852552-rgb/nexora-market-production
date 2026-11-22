@@ -89,3 +89,21 @@ If postflight checks fail:
 - Supabase Free does not provide the paid database branching capability attempted during QA.
 - Leaked-password protection was previously reported disabled in Supabase Auth; it remains a separate outstanding security setting and was not changed.
 - This runbook is a checklist, not evidence that production has been migrated or is launch-ready.
+
+
+## Transaction-scoped Supabase QA re-test — 2026-11-23
+
+Target: separate QA project `gudvguwhqhuvpblwdcil` (`nexora-market-qa`), PostgreSQL 17.12. This test used the existing two QA Auth users plus one temporary Auth user inserted only inside the test transaction. A temporary admin role was assigned only to seed three published QA products. The test explicitly ended with `ROLLBACK`.
+
+Assertions and results:
+
+1. First call through `public.create_cod_order(text,text,text,uuid)` as database role `authenticated` created exactly one order and one order item. Total was 2,500 MMK; product A stock changed from 10 to 8.
+2. Replaying the same buyer/request UUID returned the same order ID with `idempotent_replay=true`; order count, item count, and stock did not change.
+3. A new cart item added after the first order remained in the cart after replaying the original request; the replay did not submit or consume it.
+4. A second checkout contained a valid line followed by a line with insufficient stock. The RPC raised `insufficient stock`; the earlier line's order-item insert, stock decrement, and cart deletion were rolled back. Both cart rows remained; product B stock stayed 5 and product C stock stayed 1.
+5. RLS visibility passed: buyer saw one order/item, an unrelated buyer saw zero, and the seller associated with the order item saw one.
+6. All assertions passed. A post-rollback audit showed `auth.users=2`, `profiles=2`, `admin_roles=0`, and zero rows in products, carts, orders, order_items, advertisements, seller_applications, wishlists, and other marketplace tables.
+
+Verification boundary: this is a transaction-scoped test against the actual Supabase QA PostgreSQL database using `SET ROLE authenticated` and simulated JWT subject claims. It is not an actual Supabase Auth HTTP session, PostgREST HTTP RPC, or signed-in browser checkout. No PostgREST COD request was observed in the available QA logs. Do not describe this as end-to-end or production verification.
+
+A fresh read-only production audit on 2026-11-23 still found no `orders.request_id`, only the legacy three-argument COD RPC, authenticated direct INSERT grants on orders/items, and broad anon/authenticated grants on `public.reports` including TRUNCATE, REFERENCES, and TRIGGER. Production remains unchanged. No merge, deployment, migration, backup/restore, or persistent QA fixture was performed.
