@@ -1,0 +1,43 @@
+name: Export safe source package
+
+on:
+  push:
+    branches:
+      - export/source-package-2026-11-22
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact export branch
+        uses: actions/checkout@v4
+        with:
+          ref: export/source-package-2026-11-22
+          fetch-depth: 1
+      - name: Build source-only archive and exclude secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARCHIVE="SOURCE-SAFE.zip"
+          git ls-files -z | grep -zvE '(^|/)(\.env([^/]*)?|\.npmrc|\.pypirc|\.netrc|\.git-credentials|secrets)(/|$)|(^|/)([^/]*\.(pem|key|p12|pfx|jks|keystore|mobileprovision))$|(^|/)(id_rsa|id_ed25519)([^/]*)$|(^|/)(service[-_]?account|credentials)([^/]*\.json)$' > /tmp/package-files
+          if [ ! -s /tmp/package-files ]; then
+            echo "No eligible tracked source files found" >&2
+            exit 1
+          fi
+          FILE_COUNT="$(python -c 'import pathlib; print(pathlib.Path("/tmp/package-files").read_bytes().count(bytes([0])))')"
+          printf 'Repository: eei852552-rgb/nexora-market-production\nSource branch: %s\nCommit: %s\nExported at (UTC): %s\nIncluded tracked files: %s\nExcluded: .env* files, common private keys/certificates, credential files, and secrets directories.\nThis is a source snapshot; it excludes Git history, ignored local files, external databases, and secret values.\n' "export/source-package-2026-11-22" "$(git rev-parse HEAD)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$FILE_COUNT" > PACKAGE-INFO.txt
+          xargs -0 -r zip -q "$ARCHIVE" < /tmp/package-files
+          zip -q "$ARCHIVE" PACKAGE-INFO.txt
+          sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
+      - name: Upload source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: safe-source-package
+          path: |
+            SOURCE-SAFE.zip
+            SOURCE-SAFE.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
