@@ -5,6 +5,7 @@ import sys
 sql_path = Path("supabase/migrations/202611190001_cod_checkout_idempotency.sql")
 acl_path = Path("supabase/migrations/202611200001_cod_checkout_acl_hardening.sql")
 product_guard_path = Path("supabase/migrations/202611210001_product_stock_guard_alignment.sql")
+cod_order_index_path = Path("supabase/migrations/202611240001_cod_order_items_order_id_index.sql")
 workflow_path = Path(".github/workflows/cod-qa-check.yml")
 app_path = Path("app.js")
 hardening_path = Path("supabase/production-hardening.sql")
@@ -14,6 +15,7 @@ concurrency_path = Path("scripts/cod-qa-concurrency.py")
 sql = sql_path.read_text(encoding="utf-8").lower()
 acl_sql = acl_path.read_text(encoding="utf-8").lower()
 product_guard_sql = product_guard_path.read_text(encoding="utf-8").lower()
+cod_order_index_sql = cod_order_index_path.read_text(encoding="utf-8").lower()
 workflow = workflow_path.read_text(encoding="utf-8").lower()
 app = app_path.read_text(encoding="utf-8").lower()
 hardening = hardening_path.read_text(encoding="utf-8").lower()
@@ -25,6 +27,10 @@ qa_acl = qa_acl_path.read_text(encoding="utf-8").lower()
 
 checks = {
     "product stock-guard alignment migration exists": product_guard_path.exists(),
+    "COD order-item index migration exists": cod_order_index_path.exists(),
+    "COD order-item index covers order_id": "create index if not exists order_items_order_id_idx" in cod_order_index_sql and "on public.order_items (order_id)" in cod_order_index_sql,
+    "CI applies COD order-item index migration": "202611240001_cod_order_items_order_id_index.sql" in workflow,
+    "CI integration asserts COD order-item index": "order_items_order_id_idx" in integration,
     "product guard uses SECURITY DEFINER with empty search_path": "security definer" in product_guard_sql and "set search_path = ''" in product_guard_sql,
     "product guard preserves seller identity and status controls": "new.seller_id is distinct from old.seller_id" in product_guard_sql and "new.status is distinct from old.status" in product_guard_sql and "private.is_admin()" in product_guard_sql,
     "product guard does not require the buyer to be an approved seller": "private.is_approved_seller" not in product_guard_sql and "approved seller required" not in product_guard_sql,
