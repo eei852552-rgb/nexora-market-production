@@ -63,3 +63,14 @@ Online payments remain disabled and no paid service or domain was purchased.
 - Current feature branch tip is `bfff245aa286fe9ecde71f09cc30f49a4cf5c3cd`. The four commits after tested implementation baseline `3910fae39b3e3d7d2c2cb8d93a0ee7e5b8809e15` changed only `COD_CHECKOUT_RETRY_QA.md`, `DEPLOYMENT_STATUS.md`, and `docs/cod-checkout-deployment-runbook.md`; no application or migration code changed. The latest passing CI run remains [44936615100](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/44936615100) on code-equivalent commit `9f6cc650e8c000b2dc1cb0644cd8a90778c684d5`.
 - A fresh production read-only audit still finds no `orders.request_id`, only the legacy three-argument COD RPC, direct authenticated INSERT grants on orders/items, and broad anon/authenticated grants on `public.reports` (including TRUNCATE, REFERENCES, and TRIGGER). No production object or data was changed.
 - No merge, live deployment, backup/restore, or production migration was performed. Existing backups and all prior feature-branch changes were preserved.
+
+
+## COD QA update — 2026-11-24
+
+- QA-only additive migration `202611240001_cod_order_items_order_id_index.sql` applied to the separate `nexora-market-qa` project; read-only audit confirms `order_items_order_id_idx` and the buyer/request unique index.
+- QA data remains clean: 2 existing Auth users, 2 profiles, and zero products, carts, orders, or order items.
+- CI now applies the new index migration to its disposable PostgreSQL 16 database and asserts the index exists. Final branch CI run [45240917700](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/45240917700) passed static checks, PostgreSQL integration, and concurrency/cart-snapshot checks.
+- Performance Advisor's unindexed-FK count decreased from 7 to 6. It marks the new index unused because the QA table is empty; representative workload validation is still required. Leaked-password protection remains disabled.
+- Production read-only audit on 2026-11-24 confirms it is still on the legacy three-argument COD function, has no `orders.request_id`, allows authenticated direct INSERT on orders/items, and retains broad grants on `public.reports`. No production change was made.
+- Real Supabase Auth HTTP, PostgREST RPC, and browser checkout remain unverified. No merge, deployment, production migration, backup/restore, or persistent QA fixture was performed.
+- Main remains at `2da8087db864d58cd9dc3de17e1dc0f6d49b3ca0`; QA branch code/test commit for this verification is `4782f4adadac961907ae1afd98937c0035bff249`. Existing backups and earlier branch changes are preserved.
