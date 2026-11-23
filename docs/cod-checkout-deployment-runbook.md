@@ -107,3 +107,15 @@ Assertions and results:
 Verification boundary: this is a transaction-scoped test against the actual Supabase QA PostgreSQL database using `SET ROLE authenticated` and simulated JWT subject claims. It is not an actual Supabase Auth HTTP session, PostgREST HTTP RPC, or signed-in browser checkout. No PostgREST COD request was observed in the available QA logs. Do not describe this as end-to-end or production verification.
 
 A fresh read-only production audit on 2026-11-23 still found no `orders.request_id`, only the legacy three-argument COD RPC, authenticated direct INSERT grants on orders/items, and broad anon/authenticated grants on `public.reports` including TRUNCATE, REFERENCES, and TRIGGER. Production remains unchanged. No merge, deployment, migration, backup/restore, or persistent QA fixture was performed.
+
+
+## COD order-item lookup index QA — 2026-11-24
+
+- Added the additive migration `supabase/migrations/202611240001_cod_order_items_order_id_index.sql` to create `public.order_items(order_id)` support index `order_items_order_id_idx`.
+- Applied the migration only to the separate QA project `nexora-market-qa` (`gudvguwhqhuvpblwdcil`, PostgreSQL 17.12). The QA migration history records it as `cod_order_items_order_id_index` (server migration version `20261123184005`).
+- A read-only SQL audit confirmed the index definition and the existing unique buyer/request index. QA still has two existing Auth users and two profiles; products, carts, orders, and order_items remain at zero rows.
+- Updated the disposable PostgreSQL 16 CI workflow to apply this migration and the integration SQL to assert the index exists. Static checks passed, and final-branch workflow run [45240917700](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/45240917700) completed successfully, including PostgreSQL integration and concurrency/cart-snapshot tests.
+- Supabase Performance Advisor now reports six unindexed foreign keys rather than seven; `order_items_order_id` is no longer among them. It also reports the new index as unused because the QA table is empty. Do not remove the index on that basis; validate with representative data/workload before any tuning decision. Other existing performance notices include six multiple-permissive-policy groups. Leaked-password protection remains disabled and was not changed.
+- A fresh read-only production audit on 2026-11-24 still found no `orders.request_id`, only `create_cod_order(text,text,text)`, direct authenticated INSERT privileges on `orders` and `order_items`, and broad anon/authenticated grants on `public.reports` including TRUNCATE, REFERENCES, and TRIGGER. Production was not changed.
+- Verification boundary remains unchanged: CI is a disposable PostgreSQL 16 environment; QA transaction tests use the separate Supabase PostgreSQL 17.12 database with simulated JWT claims and `SET ROLE authenticated`. Real Supabase Auth HTTP, PostgREST HTTP RPC, and signed-in browser checkout remain unverified.
+- No merge, production migration, deployment, backup/restore, or persistent test-data creation was performed. Existing backups and prior branch changes were preserved.
