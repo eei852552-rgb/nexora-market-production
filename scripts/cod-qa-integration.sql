@@ -334,4 +334,19 @@ begin
   end if;
 end $rls$;
 
+-- The COD order_items -> orders foreign key has a child-side lookup index.
+do $index$
+begin
+  if not exists (
+    select 1
+    from pg_indexes
+    where schemaname='public'
+      and tablename='order_items'
+      and indexname='order_items_order_id_idx'
+      and indexdef ilike '%(order_id)%'
+  ) then
+    raise exception 'COD order_items.order_id supporting index is missing';
+  end if;
+end $index$;
+
 \echo 'PASS: COD runtime smoke tests'
