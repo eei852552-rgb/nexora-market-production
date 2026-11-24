@@ -58,3 +58,21 @@ Do not apply this migration to the production Supabase project or deploy this br
 - The available PostgREST log window showed 14 requests, all to `/`, with no `create_cod_order` mention and no `/rest/v1/orders` path. Actual Auth + PostgREST COD verification and signed-in browser checkout remain outstanding.
 - QA Security Advisor still reports leaked-password protection disabled. Performance Advisor reports 7 unindexed foreign keys and 6 multiple-permissive-policy findings.
 - Production re-audit: `orders.request_id` is absent; only the legacy three-argument COD RPC exists; authenticated direct INSERT grants remain on orders/items; and `public.reports` has RLS enabled but broad anon/authenticated table privileges including TRUNCATE. No production changes were made.
+
+## Repeat Supabase QA transaction — 2026-11-25
+
+- Reconfirmed the separate QA project `nexora-market-qa` is `ACTIVE_HEALTHY` on PostgreSQL 17.12. The production project remains separate.
+- Re-ran a fresh transaction-scoped COD test using only the two pre-existing QA Auth users. No new Auth account was created.
+- The first buyer's COD request created one order with a database-calculated total of 2,500 MMK. Repeating the same buyer/request UUID returned the same order ID with `idempotent_replay=true`; stock changed from 10 to 8 only once.
+- Added a new cart row after the first successful checkout, then replayed the original request. The replay preserved that newer cart row and did not decrement stock again.
+- Reused the same request UUID as the second buyer. A distinct order was created, confirming idempotency is scoped to `(buyer_id, request_id)`; stock changed from 8 to 7 once for that second buyer.
+- Tested atomic rollback with two cart lines ordered so a valid-stock line was processed before a later insufficient-stock line. The failure left no order or order items for that request, restored the earlier stock decrement, and preserved both cart rows.
+- Direct authenticated INSERT attempts into `orders` and `order_items` were denied.
+- RLS checks passed: the first buyer saw only their own order/items and cart; the second account (also the product seller) saw its own order plus the relevant seller order/items, but no buyer carts.
+- The complete fixture test ran inside an explicit transaction and ended with `ROLLBACK`. A subsequent read-only audit confirmed `auth.users=2`, `profiles=2`, `admin_roles=0`, and zero rows in products, carts, orders, order_items, advertisements, seller_applications, and wishlists. Both COD indexes remain present.
+- The test uses simulated JWT subject claims and database role switching. It validates the QA PostgreSQL functions, triggers, grants, and RLS; it is **not** a real Supabase Auth HTTP login, PostgREST HTTP RPC, or signed-in browser checkout.
+- A source review confirms the browser keeps one unresolved request UUID per buyer in session storage. It retains the key when the RPC or post-order account refresh fails, and clears it only after the refresh succeeds; this preserves safe retry behavior. This is a code review, not a browser end-to-end test.
+- The current branch tip is `d2527ff14f99d898bd570dea09270411f6abf314`. Compared with the last passing code/test commit `4782f4adadac961907ae1afd98937c0035bff249`, the two intervening commits changed documentation only. The latest passing CI run remains [45240917700](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/45240917700) on the code/test commit; it is a disposable PostgreSQL 16 CI run, not Supabase Auth/PostgREST or production verification.
+- Remaining QA blockers: `supabase_admin` future-table defaults still grant broad privileges to anon/authenticated and require an owner-authorized fix; leaked-password protection remains disabled; real Auth/PostgREST/browser verification is still outstanding.
+- Production read-only verification still finds no `orders.request_id`, only the legacy three-argument COD RPC, authenticated direct INSERT grants on orders/items, and 14 broad anon/authenticated grants on `public.reports` (including DDL-like table privileges). No production object or row was changed.
+- No merge, deployment, production migration, backup/restore, or persistent QA fixture was performed. Existing branch changes and backups remain preserved.
