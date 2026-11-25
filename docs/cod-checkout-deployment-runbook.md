@@ -119,3 +119,22 @@ A fresh read-only production audit on 2026-11-23 still found no `orders.request_
 - A fresh read-only production audit on 2026-11-24 still found no `orders.request_id`, only `create_cod_order(text,text,text)`, direct authenticated INSERT privileges on `orders` and `order_items`, and broad anon/authenticated grants on `public.reports` including TRUNCATE, REFERENCES, and TRIGGER. Production was not changed.
 - Verification boundary remains unchanged: CI is a disposable PostgreSQL 16 environment; QA transaction tests use the separate Supabase PostgreSQL 17.12 database with simulated JWT claims and `SET ROLE authenticated`. Real Supabase Auth HTTP, PostgREST HTTP RPC, and signed-in browser checkout remain unverified.
 - No merge, production migration, deployment, backup/restore, or persistent test-data creation was performed. Existing backups and prior branch changes were preserved.
+
+
+## Frontend/RPC compatibility audit — 2026-11-26
+
+A read-only source comparison found an important release-order constraint:
+
+- The current `main` branch `app.js` still calls `public.create_cod_order` with only the three delivery arguments. It does not supply `p_request_id` and does not implement the new retry-key handling.
+- The COD candidate branch `app.js` calls the four-argument RPC and supplies a per-buyer UUID held in `sessionStorage`. It retains the request key after RPC/refresh errors and clears it only after a successful refresh.
+- `main/config.js` points to the production Supabase project `nbhfdiiehukdtusxksni`; candidate-branch `config.js` points to the separate QA project `gudvguwhqhuvpblwdcil`.
+- The GitHub Pages workflow on `main` deploys only when `main` changes (or by manual workflow dispatch). Pushing the candidate branch does not deploy it to GitHub Pages.
+
+Consequences:
+
+1. Do not apply the candidate migration by itself: it drops the legacy three-argument RPC, so the currently deployed/main frontend would no longer be compatible.
+2. Do not deploy the candidate branch's `config.js` unchanged: that would point the public site at the QA Supabase project.
+3. Any future release must be a coordinated, owner-approved maintenance-window change: disable new checkout attempts, verify a recoverable backup, prepare a production release commit that contains the four-argument frontend while retaining the production Supabase URL/publishable key, apply and verify the reviewed database migration, deploy the matching frontend, and run approved authenticated postflight checks before reopening checkout.
+4. The exact production release commit and deployment order must be reviewed together. No production migration, merge, or deployment is authorized by this audit.
+
+This compatibility review is source/config/workflow inspection only. It is not a live browser test and does not prove production checkout behavior.
