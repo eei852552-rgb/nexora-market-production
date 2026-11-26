@@ -138,3 +138,16 @@ Consequences:
 4. The exact production release commit and deployment order must be reviewed together. No production migration, merge, or deployment is authorized by this audit.
 
 This compatibility review is source/config/workflow inspection only. It is not a live browser test and does not prove production checkout behavior.
+
+
+## QA ACL migration and current audit — 2026-11-27
+
+- Applied `supabase/migrations/202611200001_cod_checkout_acl_hardening.sql` only to QA project `gudvguwhqhuvpblwdcil`; Supabase migration history now records `cod_checkout_acl_hardening` as server version `20261126184458`. This reconciles the previously missing migration-ledger entry. The migration changes grants only on `orders`, `order_items`, `carts`, and `products`; it does not modify rows.
+- Post-apply read-only audit confirms RLS on all nine QA public tables; no anon/authenticated effective TRUNCATE, REFERENCES, or TRIGGER on current public tables; no authenticated direct INSERT on orders/items; cart CRUD and public product SELECT remain available. QA row counts remain two profiles and zero rows in the other eight marketplace tables.
+- Default privileges are still an owner-level blocker: `supabase_admin` future public tables, sequences, and functions default to broad anon/authenticated privileges. The current SQL role is non-superuser `postgres` and is not a member of `supabase_admin`. The `postgres` default ACL for future public tables is restricted, but its future public sequences and functions still default to anon/authenticated grants. Do not treat current-table hardening as proof that future-object defaults are safe.
+- QA COD function grants/security were rechecked: public four-argument RPC is invoker, private implementation/helpers are definer with empty search_path, authenticated-only execute, no anon/PUBLIC execute. The stock guard locks and validates the product before decrementing stock.
+- Latest CI observed at this audit: [45674333567](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/45674333567), successful on branch tip `c16233e`; it uses disposable PostgreSQL 16. The prior Supabase QA transaction tests use simulated JWT claims and role switching on PostgreSQL 17.12. Real Auth HTTP, PostgREST COD HTTP, and signed-in browser checkout remain unverified.
+- Production remains on the legacy three-argument COD RPC with no request_id; authenticated direct INSERT on orders/items remains allowed. Production reports RLS is enabled but anon/authenticated retain broad table privileges including TRUNCATE, REFERENCES, and TRIGGER. No production changes were made.
+- No merge, deployment, production migration, backup/restore, or persistent QA fixture was performed. Keep the candidate config pointed at QA; never deploy it unchanged to the production site.
+
+This is a read-only verification note plus a QA-only ACL migration record. It does not authorize a production change.
