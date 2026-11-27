@@ -2,11 +2,11 @@
 -- COD trigger bodies below are copied from the current production definitions.
 -- This is CI-only and contains no production data.
 create extension if not exists pgcrypto;
-do $ begin
+do $$ begin
   if not exists (select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
   if not exists (select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
   if not exists (select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
-end $;
+end $$;
 -- Mirror Supabase service_role defaults for the future-object privilege tests.
 alter default privileges for role postgres in schema public grant all on tables to service_role;
 alter default privileges for role postgres in schema public grant all on sequences to service_role;
