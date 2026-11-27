@@ -151,3 +151,14 @@ This compatibility review is source/config/workflow inspection only. It is not a
 - No merge, deployment, production migration, backup/restore, or persistent QA fixture was performed. Keep the candidate config pointed at QA; never deploy it unchanged to the production site.
 
 This is a read-only verification note plus a QA-only ACL migration record. It does not authorize a production change.
+
+
+## QA future-object default ACL addendum — 2026-11-28
+
+- Two QA-only migrations were applied to `nexora-market-qa`: `20261127190205` (`qa_postgres_sequence_function_default_acl`) and `20261127190339` (`qa_postgres_function_global_execute_acl_hardening`).
+- The first removes schema-local default grants to anon/authenticated/PUBLIC for postgres-owned public sequences/functions. The second removes PostgreSQL's global default PUBLIC EXECUTE on future functions created by postgres; a schema-local REVOKE alone does not remove this inherited global default.
+- A transaction-scoped probe created a future public table, sequence, and function. anon/authenticated had no privileges; service_role retained its expected grants. The transaction rolled back and the probe objects are absent.
+- The `supabase_admin` default ACL remains broad and requires an owner-authorized correction. These QA migrations must not be treated as production approval or copied to production without a separate schema/owner review.
+- CI run [46054840113](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/46054840113) passed static and disposable PostgreSQL 16 integration jobs. It is not real Auth/PostgREST or production verification.
+- Production still has no `orders.request_id`, the legacy three-argument COD RPC, authenticated direct INSERT grants on orders/items, and broad `public.reports` grants. No production change was made.
+- No merge, deployment, backup/restore, or main-branch update occurred. Keep the candidate on its feature branch until owner-approved Auth/PostgREST/browser QA and production preflight are complete.

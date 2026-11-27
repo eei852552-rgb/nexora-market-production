@@ -130,3 +130,29 @@ Online payments remain disabled and no paid service or domain was purchased.
 3. Have the Supabase owner review and correct future-object default ACLs for `supabase_admin` (and review the remaining postgres sequence/function defaults) before adding new public objects.
 4. Review production `reports` grants as a separate least-privilege change; do not mix it into the COD migration without its own QA.
 5. Before any production release, verify a recoverable backup and restore path, review the complete migration against current production schema, and coordinate frontend/config/database versions in an approved maintenance window.
+
+
+## QA future-object default ACL follow-up — 2026-11-28
+
+- Re-audited the isolated QA project `nexora-market-qa` (`gudvguwhqhuvpblwdcil`, PostgreSQL 17.12) and production `nexora-market` (`nbhfdiiehukdtusxksni`, PostgreSQL 17.11). Both remain ACTIVE_HEALTHY.
+- Applied two additional migrations to QA only:
+  - `20261127190205` — `qa_postgres_sequence_function_default_acl`
+  - `20261127190339` — `qa_postgres_function_global_execute_acl_hardening`
+- The first migration removed schema-local default grants to anon/authenticated/PUBLIC for postgres-owned public sequences and functions. A transactional probe then exposed an important PostgreSQL behavior: a schema-local REVOKE does not remove the built-in global PUBLIC EXECUTE default on newly-created functions.
+- The second migration revoked that global PUBLIC EXECUTE default for future functions created by postgres. A fresh transaction-scoped probe created a public table, sequence, and function after the migrations; anon/authenticated received no table, sequence, or function privileges, while service_role retained its expected table INSERT, sequence USAGE, and function EXECUTE. The probe transaction was rolled back; all three probe objects are absent afterward.
+- Read-only verification reports zero unsafe defaults for postgres-owned public tables/sequences/functions, including global PUBLIC function EXECUTE. The `supabase_admin`-owned defaults remain broad for tables, sequences, and functions. The connected postgres role is not a superuser and is not a member of supabase_admin, so this remaining item requires an owner-authorized change. No attempt was made to bypass that boundary.
+- QA application data remains unchanged: two pre-existing Auth users and two profiles; products, carts, orders, order_items, admin_roles, advertisements, seller_applications, and wishlists remain empty. No persistent test account or checkout fixture was created.
+- CI run [46054840113](https://github.com/eei852552-rgb/nexora-market-production/actions/runs/46054840113) passed on candidate commit `9dec7a97d0df267359189272fee255534c194a74`. Both static checks and disposable PostgreSQL 16 integration tests passed, including the new future-object privilege probe and existing COD retry/concurrency/cart-snapshot checks. This is CI verification, not Supabase Auth/PostgREST or production verification.
+- QA Security Advisor still reports only `auth_leaked_password_protection` disabled. QA Performance Advisor reports 6 unindexed foreign keys and 6 multiple-permissive-policy groups; Health Advisor has no findings. See [Leaked Password Protection guidance](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection), [unindexed foreign keys](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys), and [multiple permissive policies](https://supabase.com/docs/guides/database/database-linter?lint=0006_multiple_permissive_policies).
+- Production read-only audit remains unchanged: `orders.request_id` is absent; only the legacy three-argument COD RPC exists; authenticated direct INSERT on `orders` and `order_items` remains allowed; `public.reports` has RLS enabled but anon/authenticated retain broad privileges including TRUNCATE, REFERENCES, and TRIGGER. The reports table currently has zero rows. No production SQL or migration was run.
+- The QA branch's `config.js` points to the QA project; `main/config.js` points to production. Never deploy the QA branch configuration unchanged.
+- Real Supabase Auth HTTP login, PostgREST COD RPC, and signed-in browser checkout remain unverified. The recent QA log window surfaced postgres logs only and no edge/API request evidence. Simulated JWT/role tests and disposable PostgreSQL CI are not end-to-end verification.
+- Candidate branch tip is `9dec7a97d0df267359189272fee255534c194a74`; `main` remains `2da8087db864d58cd9dc3de17e1dc0f6d49b3ca0`. The feature branch is 102 commits ahead, 0 behind, and has no open pull request.
+- No merge, production migration, live deployment, backup/restore, or main-branch update was performed. Existing backups and prior feature-branch changes remain untouched.
+
+## Next safe gates — 2026-11-28
+
+1. Obtain an owner-approved existing QA Auth session and verify the four-argument COD RPC through actual Supabase Auth + PostgREST, then a controlled signed-in browser checkout. Do not bypass Auth rate limits or create repeated accounts.
+2. Have the Supabase owner review and correct the `supabase_admin` future-object defaults in QA; review any remaining global/default ACLs separately.
+3. Review production `public.reports` grants as an independent least-privilege change; do not mix it into the COD migration without its own QA.
+4. Before any production change, verify a recoverable backup and restore path, review the complete migration against the current production schema, and coordinate frontend/config/database versions in an approved maintenance window.
