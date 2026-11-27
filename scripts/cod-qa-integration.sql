@@ -355,7 +355,7 @@ begin;
 create table public.qa_default_acl_probe_table(id integer);
 create sequence public.qa_default_acl_probe_seq;
 create function public.qa_default_acl_probe_fn() returns integer
-language sql set search_path = '' as $ select 1 $;
+language sql set search_path = '' as $fn$ select 1 $fn$;
 do $default_acl$
 begin
   if has_table_privilege('anon','public.qa_default_acl_probe_table','SELECT')
