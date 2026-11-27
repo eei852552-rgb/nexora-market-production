@@ -6,6 +6,8 @@ sql_path = Path("supabase/migrations/202611190001_cod_checkout_idempotency.sql")
 acl_path = Path("supabase/migrations/202611200001_cod_checkout_acl_hardening.sql")
 product_guard_path = Path("supabase/migrations/202611210001_product_stock_guard_alignment.sql")
 cod_order_index_path = Path("supabase/migrations/202611240001_cod_order_items_order_id_index.sql")
+sequence_function_acl_path = Path("supabase/migrations/202611280001_qa_postgres_sequence_function_default_acl.sql")
+global_function_acl_path = Path("supabase/migrations/202611280002_qa_postgres_function_global_execute_acl.sql")
 workflow_path = Path(".github/workflows/cod-qa-check.yml")
 app_path = Path("app.js")
 hardening_path = Path("supabase/production-hardening.sql")
@@ -16,6 +18,8 @@ sql = sql_path.read_text(encoding="utf-8").lower()
 acl_sql = acl_path.read_text(encoding="utf-8").lower()
 product_guard_sql = product_guard_path.read_text(encoding="utf-8").lower()
 cod_order_index_sql = cod_order_index_path.read_text(encoding="utf-8").lower()
+sequence_function_acl_sql = sequence_function_acl_path.read_text(encoding="utf-8").lower()
+global_function_acl_sql = global_function_acl_path.read_text(encoding="utf-8").lower()
 workflow = workflow_path.read_text(encoding="utf-8").lower()
 app = app_path.read_text(encoding="utf-8").lower()
 hardening = hardening_path.read_text(encoding="utf-8").lower()
@@ -31,6 +35,14 @@ checks = {
     "COD order-item index covers order_id": "create index if not exists order_items_order_id_idx" in cod_order_index_sql and "on public.order_items (order_id)" in cod_order_index_sql,
     "CI applies COD order-item index migration": "202611240001_cod_order_items_order_id_index.sql" in workflow,
     "CI integration asserts COD order-item index": "order_items_order_id_idx" in integration,
+    "QA sequence/function default ACL migrations exist": sequence_function_acl_path.exists() and global_function_acl_path.exists(),
+    "CI applies both QA sequence/function default ACL migrations": "202611280001_qa_postgres_sequence_function_default_acl.sql" in workflow and "202611280002_qa_postgres_function_global_execute_acl.sql" in workflow,
+    "QA migration revokes postgres-owned public sequence defaults": "revoke all on sequences from public, anon, authenticated" in sequence_function_acl_sql,
+    "QA migration revokes postgres-owned schema function defaults": "revoke execute on functions from public, anon, authenticated" in sequence_function_acl_sql,
+    "QA migration revokes global PUBLIC function EXECUTE default": "alter default privileges for role postgres" in global_function_acl_sql and "revoke execute on functions from public" in global_function_acl_sql,
+    "QA default ACL migrations do not alter supabase_admin defaults": "alter default privileges for role supabase_admin" not in sequence_function_acl_sql + global_function_acl_sql,
+    "CI probes future table, sequence, and function grants": "qa_default_acl_probe_table" in integration and "qa_default_acl_probe_seq" in integration and "qa_default_acl_probe_fn" in integration,
+    "CI fixture preserves service_role defaults": "create role service_role nologin" in fixture and "grant all on sequences to service_role" in fixture and "grant execute on functions to service_role" in fixture,
     "product guard uses SECURITY DEFINER with empty search_path": "security definer" in product_guard_sql and "set search_path = ''" in product_guard_sql,
     "product guard preserves seller identity and status controls": "new.seller_id is distinct from old.seller_id" in product_guard_sql and "new.status is distinct from old.status" in product_guard_sql and "private.is_admin()" in product_guard_sql,
     "product guard does not require the buyer to be an approved seller": "private.is_approved_seller" not in product_guard_sql and "approved seller required" not in product_guard_sql,

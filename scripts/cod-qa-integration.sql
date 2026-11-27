@@ -349,4 +349,50 @@ begin
   end if;
 end $index$;
 
+
+-- Probe objects created after default-ACL migrations. Everything is rolled back.
+begin;
+create table public.qa_default_acl_probe_table(id integer);
+create sequence public.qa_default_acl_probe_seq;
+create function public.qa_default_acl_probe_fn() returns integer
+language sql set search_path = '' as $ select 1 $;
+do $default_acl$
+begin
+  if has_table_privilege('anon','public.qa_default_acl_probe_table','SELECT')
+     or has_table_privilege('anon','public.qa_default_acl_probe_table','INSERT')
+     or has_table_privilege('anon','public.qa_default_acl_probe_table','UPDATE')
+     or has_table_privilege('anon','public.qa_default_acl_probe_table','DELETE')
+     or has_table_privilege('anon','public.qa_default_acl_probe_table','TRUNCATE')
+     or has_table_privilege('anon','public.qa_default_acl_probe_table','REFERENCES')
+     or has_table_privilege('anon','public.qa_default_acl_probe_table','TRIGGER')
+     or has_table_privilege('authenticated','public.qa_default_acl_probe_table','SELECT')
+     or has_table_privilege('authenticated','public.qa_default_acl_probe_table','INSERT')
+     or has_table_privilege('authenticated','public.qa_default_acl_probe_table','UPDATE')
+     or has_table_privilege('authenticated','public.qa_default_acl_probe_table','DELETE')
+     or has_table_privilege('authenticated','public.qa_default_acl_probe_table','TRUNCATE')
+     or has_table_privilege('authenticated','public.qa_default_acl_probe_table','REFERENCES')
+     or has_table_privilege('authenticated','public.qa_default_acl_probe_table','TRIGGER') then
+    raise exception 'new postgres-owned public table received API-role privileges';
+  end if;
+  if has_sequence_privilege('anon','public.qa_default_acl_probe_seq','USAGE')
+     or has_sequence_privilege('anon','public.qa_default_acl_probe_seq','SELECT')
+     or has_sequence_privilege('anon','public.qa_default_acl_probe_seq','UPDATE')
+     or has_sequence_privilege('authenticated','public.qa_default_acl_probe_seq','USAGE')
+     or has_sequence_privilege('authenticated','public.qa_default_acl_probe_seq','SELECT')
+     or has_sequence_privilege('authenticated','public.qa_default_acl_probe_seq','UPDATE') then
+    raise exception 'new postgres-owned public sequence received API-role privileges';
+  end if;
+  if has_function_privilege('anon','public.qa_default_acl_probe_fn()','EXECUTE')
+     or has_function_privilege('authenticated','public.qa_default_acl_probe_fn()','EXECUTE') then
+    raise exception 'new postgres-owned public function received API-role EXECUTE';
+  end if;
+  if not has_table_privilege('service_role','public.qa_default_acl_probe_table','INSERT')
+     or not has_sequence_privilege('service_role','public.qa_default_acl_probe_seq','USAGE')
+     or not has_function_privilege('service_role','public.qa_default_acl_probe_fn()','EXECUTE') then
+    raise exception 'service_role default privileges were not preserved';
+  end if;
+end
+$default_acl$;
+rollback;
+
 \echo 'PASS: COD runtime smoke tests'
